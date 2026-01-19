@@ -1,0 +1,28 @@
+# Web Framework
+streamlit==1.31.0
+
+# Database
+sqlite3  # Built-in with Python
+
+# Instagram Scraping
+instagrapi==2.0.0
+
+# Browser Automation
+playwright==1.41.0
+
+# AI/LLM
+anthropic==0.18.1
+
+# Google Drive Integration
+google-auth==2.27.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.116.0
+
+# Utilities
+python-dotenv==1.0.1
+requests==2.31.0
+pandas==2.2.0
+
+# Date/Time
+python-dateutil==2.8.2
