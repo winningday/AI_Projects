@@ -1,6 +1,6 @@
 """
 Instagram Comment Assistant - Main Streamlit Application
-Phase 1: Post Management and Context Editing
+Phase 2: Comment Scraping and Response Management UI
 """
 
 import streamlit as st
@@ -8,6 +8,7 @@ from datetime import datetime
 import config
 import database
 import utils
+import scraper
 
 
 def init_app():
@@ -46,14 +47,25 @@ def show_sidebar():
     # Statistics
     st.sidebar.header("Statistics")
     stats = database.get_stats()
+    status_counts = database.get_response_status_counts()
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
         st.metric("Posts", stats['total_posts'])
         st.metric("Comments", stats['total_comments'])
+        st.metric("No Response", status_counts['no_response'])
     with col2:
-        st.metric("Pending", stats['pending_responses'])
-        st.metric("Posted", stats['posted_responses'])
+        st.metric("Pending", status_counts['pending'])
+        st.metric("Approved", status_counts['approved'])
+        st.metric("Posted", status_counts['posted'])
+
+    st.sidebar.divider()
+
+    # Demo mode indicator
+    if config.DEMO_MODE:
+        st.sidebar.info("🎭 **DEMO MODE**\nUsing mock data")
+    else:
+        st.sidebar.success("📱 **LIVE MODE**\nUsing Instagram API")
 
     st.sidebar.divider()
 
@@ -164,9 +176,29 @@ def page_post_management():
                 st.rerun()
 
         with col2:
-            # Placeholder for Phase 2
-            if st.button("🔄 Fetch New Comments", use_container_width=True, disabled=True):
-                st.info("This feature will be enabled in Phase 2")
+            # Fetch comments button (Phase 2 - now enabled!)
+            if st.button("🔄 Fetch New Comments", use_container_width=True, type="secondary"):
+                with st.spinner("Fetching comments..."):
+                    result = scraper.fetch_post_comments(post['url'])
+
+                    if result['success']:
+                        # Update last scraped timestamp
+                        database.update_last_scraped(post['url'])
+
+                        st.success(f"✅ Fetched {result['total_comments']} comments, {result['new_comments']} new!")
+                        if config.DEMO_MODE:
+                            st.info(f"🎭 Demo Mode: Generated mock comments")
+
+                        # Refresh post data
+                        st.session_state['current_post'] = database.get_post(post['url'])
+                        st.rerun()
+                    else:
+                        st.error("Failed to fetch comments")
+
+        # Show comment statistics for this post
+        comment_count = database.get_comment_count_by_post(post['url'])
+        if comment_count > 0:
+            st.metric("Comments for this Post", comment_count)
 
     # Display all posts
     st.divider()
@@ -202,15 +234,181 @@ def page_post_management():
 
 
 def page_response_management():
-    """Response Management Page - Placeholder for Phase 2+."""
+    """Response Management Page - Phase 2."""
     st.title("💬 Response Management")
-    st.info("🚧 This page will be implemented in Phase 4: Response approval interface")
+    st.write("View and manage comment responses.")
 
-    st.write("Features coming in future phases:")
-    st.write("- View all comments with generated responses")
-    st.write("- Filter by status (Pending, Approved, Posted)")
-    st.write("- Edit and approve responses")
-    st.write("- Bulk post approved responses")
+    # Get status counts for tab labels
+    status_counts = database.get_response_status_counts()
+
+    # Create tabs with counts
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        f"🆕 No Response ({status_counts['no_response']})",
+        f"⏳ Pending ({status_counts['pending']})",
+        f"✅ Approved ({status_counts['approved']})",
+        f"📤 Posted ({status_counts['posted']})",
+        f"⏭️ Skipped ({status_counts['skipped']})",
+        "📋 All"
+    ])
+
+    with tab1:
+        display_comments_tab(None, "No Response Yet")
+
+    with tab2:
+        display_comments_tab("pending", "Pending Review")
+
+    with tab3:
+        display_comments_tab("approved", "Approved for Posting")
+
+    with tab4:
+        display_comments_tab("posted", "Posted to Instagram")
+
+    with tab5:
+        display_comments_tab("skipped", "Skipped")
+
+    with tab6:
+        display_comments_tab("all", "All Comments")
+
+
+def display_comments_tab(status, title):
+    """Display comments filtered by status."""
+    st.subheader(title)
+
+    # Get comments based on status
+    if status == "all":
+        comments = database.get_comments_with_responses()
+    elif status is None:
+        # Comments without responses
+        comments = database.get_comments_by_response_status(None)
+    else:
+        # Comments with specific response status
+        comments = database.get_comments_by_response_status(status)
+
+    if not comments:
+        st.info(f"No comments in this category.")
+        return
+
+    st.write(f"**{len(comments)} comment(s)**")
+
+    # Display each comment
+    for comment in comments:
+        display_comment_card(comment, status)
+
+
+def display_comment_card(comment, status):
+    """Display a single comment with its response in an expandable card."""
+    # Format the timestamp
+    timestamp_str = utils.format_timestamp(comment['timestamp'])
+
+    # Create expander title with username and timestamp
+    expander_title = f"@{comment['username']} • {timestamp_str}"
+
+    # Add status badge if there's a response
+    if comment.get('response_status'):
+        badge = utils.create_status_badge(comment['response_status'])
+        expander_title = f"{badge} {expander_title}"
+
+    with st.expander(expander_title, expanded=False):
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            # Original comment
+            st.write("**Original Comment:**")
+            st.write(comment['comment_text'])
+
+            # Check if this is a question
+            if utils.is_question(comment['comment_text']):
+                st.caption("❓ Detected as question")
+
+            st.divider()
+
+            # Show response section based on status
+            if status is None:
+                # No response yet
+                st.info("📝 Response will be generated in Phase 3 (Claude API integration)")
+                st.caption("_This comment doesn't have a response yet. Response generation will be implemented in the next phase._")
+
+            elif status in ['pending', 'approved', 'posted', 'skipped']:
+                # Has a response
+                st.write("**Chinese Translation of Comment:**")
+                if comment.get('comment_translation_cn'):
+                    st.write(comment['comment_translation_cn'])
+                else:
+                    st.caption("_Translation will be generated in Phase 3_")
+
+                st.divider()
+
+                st.write("**Suggested Response:**")
+                if comment.get('suggested_response_en'):
+                    # Editable response text
+                    response_text = st.text_area(
+                        "Response (editable)",
+                        value=comment.get('approved_response_en') or comment['suggested_response_en'],
+                        height=100,
+                        key=f"response_text_{comment['id']}",
+                        label_visibility="collapsed"
+                    )
+
+                    # Chinese translation of response
+                    if comment.get('suggested_response_cn'):
+                        st.caption(f"中文: {comment['suggested_response_cn']}")
+                else:
+                    st.info("_Response will be generated in Phase 3_")
+
+            # Post URL for reference
+            st.caption(f"Post: {utils.truncate_text(comment['post_url'], 60)}")
+
+        with col2:
+            st.write("**Actions:**")
+
+            # Different actions based on status
+            if status is None:
+                # No response yet - can't take actions until Phase 3
+                st.info("Generate response first (Phase 3)")
+
+            elif status == 'pending':
+                # Pending - can approve or skip
+                if st.button("✅ Approve", key=f"approve_{comment['id']}", use_container_width=True):
+                    # Update response status to approved
+                    if comment.get('response_id'):
+                        database.update_response_status(comment['response_id'], 'approved')
+                        database.mark_comment_response_approved(comment['id'])
+                        st.success("Approved!")
+                        st.rerun()
+
+                if st.button("⏭️ Skip", key=f"skip_{comment['id']}", use_container_width=True):
+                    # Update response status to skipped
+                    if comment.get('response_id'):
+                        database.update_response_status(comment['response_id'], 'skipped')
+                        st.info("Skipped!")
+                        st.rerun()
+
+            elif status == 'approved':
+                # Approved - can post (Phase 5) or unapprove
+                st.success("✓ Approved")
+
+                if st.button("📤 Post Now", key=f"post_{comment['id']}", use_container_width=True, disabled=True):
+                    st.info("Posting will be implemented in Phase 5")
+
+                if st.button("↩️ Unapprove", key=f"unapprove_{comment['id']}", use_container_width=True):
+                    if comment.get('response_id'):
+                        database.update_response_status(comment['response_id'], 'pending')
+                        st.info("Moved back to pending")
+                        st.rerun()
+
+            elif status == 'posted':
+                # Posted - show posted timestamp
+                st.success("✅ Posted")
+                if comment.get('posted_at'):
+                    st.caption(f"Posted {utils.format_timestamp(comment['posted_at'])}")
+
+            elif status == 'skipped':
+                # Skipped - can unskip
+                if st.button("↩️ Move to Pending", key=f"unskip_{comment['id']}", use_container_width=True):
+                    if comment.get('response_id'):
+                        database.update_response_status(comment['response_id'], 'pending')
+                        st.info("Moved to pending")
+                        st.rerun()
 
 
 def page_settings():
@@ -220,6 +418,17 @@ def page_settings():
     st.header("Configuration Status")
 
     config_summary = config.get_config_summary()
+
+    # Demo Mode Status
+    st.subheader("Mode")
+    if config_summary['demo_mode']:
+        st.info("🎭 **DEMO MODE** - Using mock data for testing")
+        st.write("Set `DEMO_MODE=false` in `.env` to use real Instagram API")
+    else:
+        st.success("📱 **LIVE MODE** - Using real Instagram API")
+        st.warning("Make sure Instagram credentials are configured")
+
+    st.divider()
 
     # API Keys
     st.subheader("API Keys")

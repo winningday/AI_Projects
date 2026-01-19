@@ -394,3 +394,103 @@ def get_stats() -> Dict:
             'posted_responses': response_counts.get('posted', 0),
             'skipped_responses': response_counts.get('skipped', 0),
         }
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+def get_comment_count_by_post(post_url: str) -> int:
+    """Get total comment count for a specific post."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM comments WHERE post_url = ?
+        """, (post_url,))
+        return cursor.fetchone()['count']
+
+
+def get_total_comment_count() -> int:
+    """Get total count of all comments in database."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM comments")
+        return cursor.fetchone()['count']
+
+
+def get_comments_by_response_status(status: Optional[str] = None) -> List[Dict]:
+    """
+    Get comments filtered by their response status.
+
+    Args:
+        status: 'pending', 'approved', 'posted', 'skipped', or None for comments without responses
+
+    Returns:
+        List of comment dicts with response data
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        if status is None:
+            # Get comments without any responses
+            cursor.execute("""
+                SELECT c.*, NULL as response_id, NULL as suggested_response_en,
+                       NULL as suggested_response_cn, NULL as comment_translation_cn,
+                       NULL as approved_response_en, NULL as response_status
+                FROM comments c
+                LEFT JOIN responses r ON c.id = r.comment_id
+                WHERE r.id IS NULL
+                ORDER BY c.timestamp DESC
+            """)
+        else:
+            # Get comments with specific response status
+            cursor.execute("""
+                SELECT c.*, r.id as response_id, r.suggested_response_en,
+                       r.suggested_response_cn, r.comment_translation_cn,
+                       r.approved_response_en, r.status as response_status,
+                       r.created_at as response_created_at
+                FROM comments c
+                JOIN responses r ON c.id = r.comment_id
+                WHERE r.status = ?
+                ORDER BY c.timestamp DESC
+            """, (status,))
+
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_response_status_counts() -> Dict[str, int]:
+    """
+    Get counts of comments by their response status.
+    Includes count of comments without responses.
+
+    Returns:
+        Dict with keys: no_response, pending, approved, posted, skipped
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # Count comments without responses
+        cursor.execute("""
+            SELECT COUNT(*) as count
+            FROM comments c
+            LEFT JOIN responses r ON c.id = r.comment_id
+            WHERE r.id IS NULL
+        """)
+        no_response = cursor.fetchone()['count']
+
+        # Count by status
+        cursor.execute("""
+            SELECT r.status, COUNT(*) as count
+            FROM responses r
+            GROUP BY r.status
+        """)
+        status_counts = {row['status']: row['count'] for row in cursor.fetchall()}
+
+        # Ensure all statuses are present
+        result = {
+            'no_response': no_response,
+            'pending': status_counts.get('pending', 0),
+            'approved': status_counts.get('approved', 0),
+            'posted': status_counts.get('posted', 0),
+            'skipped': status_counts.get('skipped', 0),
+        }
+
+        return result

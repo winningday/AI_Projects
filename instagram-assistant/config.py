@@ -27,6 +27,9 @@ GOOGLE_DRIVE_CREDENTIALS_PATH = os.getenv("GOOGLE_DRIVE_CREDENTIALS_PATH", "cred
 # Instagram Configuration
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 
+# Demo Mode (set to false to use real Instagram API)
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+
 # Posting Configuration
 MIN_DELAY = int(os.getenv("MIN_DELAY", "8"))
 MAX_DELAY = int(os.getenv("MAX_DELAY", "20"))
@@ -48,8 +51,9 @@ def validate_config():
     """Validate that required configuration is present."""
     errors = []
 
-    if not ANTHROPIC_API_KEY:
-        errors.append("ANTHROPIC_API_KEY is required in .env file")
+    # Only require API key if not in demo mode
+    if not DEMO_MODE and not ANTHROPIC_API_KEY:
+        errors.append("ANTHROPIC_API_KEY is required in .env file when DEMO_MODE=false")
 
     return errors
 
@@ -62,6 +66,7 @@ def get_config_summary():
         "database_path": str(DATABASE_PATH),
         "session_file_path": str(SESSION_FILE_PATH),
         "user_profile_path": str(USER_PROFILE_PATH),
+        "demo_mode": DEMO_MODE,
         "anthropic_api_key_set": bool(ANTHROPIC_API_KEY),
         "instagram_username": INSTAGRAM_USERNAME,
         "google_drive_enabled": bool(GOOGLE_DRIVE_DOCUMENT_ID),
