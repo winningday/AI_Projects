@@ -1,0 +1,40 @@
+Senior Software Engineer — Platform Team
+Stripe
+
+About Stripe
+Stripe is a financial infrastructure platform for businesses. Millions of companies—from the world's largest enterprises to the most ambitious startups—use Stripe to accept payments, grow their revenue, and accelerate new business opportunities. Our mission is to increase the GDP of the internet.
+
+About the Role
+We're looking for a Senior Software Engineer to join our Platform team, which owns the core infrastructure that all of Stripe's products are built on. You'll work on systems that handle billions of API requests per month with 99.999% uptime.
+
+What You'll Do
+- Design and build highly available distributed systems that serve as the foundation for all Stripe products
+- Partner with product teams to define and build new platform capabilities
+- Drive technical strategy and architecture decisions with long-lasting impact
+- Mentor engineers across the company; establish and improve engineering standards
+- Lead incident response and reliability improvements
+- Collaborate cross-functionally with Product, Security, and Data teams
+
+What We're Looking For
+- 5+ years of software engineering experience
+- Deep experience with distributed systems, databases, and high-throughput APIs
+- Strong systems design skills — you can architect solutions for scale
+- Experience leading technical projects end-to-end
+- Excellent communication skills; you can explain complex technical concepts clearly
+- Track record of improving reliability and performance of production systems
+- Passion for developer experience and building tools other engineers love
+
+Nice to Have
+- Experience with payments, fintech, or financial infrastructure
+- Open source contributions or public technical writing
+- Experience scaling systems to handle 100M+ requests/day
+- Familiarity with Ruby, Go, or Java
+
+Our Tech Stack
+Ruby, Go, Java, MySQL, Redis, Kafka, Kubernetes, AWS
+
+Stripe Values
+- Move with urgency and focus
+- Think rigorously
+- Trust and amplify each other
+- Act like an owner
