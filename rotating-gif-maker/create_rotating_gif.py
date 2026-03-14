@@ -112,22 +112,50 @@ def make_frame(
 # GIF assembly
 # ---------------------------------------------------------------------------
 
+def _rgba_to_p(frame_rgba: Image.Image, n_colors: int) -> tuple:
+    """
+    Convert an RGBA frame to P-mode (palette) while preserving transparency.
+    Returns (p_frame, transparency_index).
+    """
+    r, g, b, a = frame_rgba.split()
+    rgb = Image.merge("RGB", (r, g, b))
+
+    # Reserve the last palette slot for the transparent colour
+    trans_index = n_colors - 1
+    p = rgb.quantize(colors=trans_index, dither=Image.Dither.FLOYDSTEINBERG)
+
+    # Replace fully-transparent pixels with the reserved index
+    p_pixels = list(p.tobytes())
+    a_pixels = list(a.tobytes())
+    new_pixels = [trans_index if av < 128 else p_pixels[i]
+                  for i, av in enumerate(a_pixels)]
+
+    result = Image.new("P", frame_rgba.size)
+    result.putdata(new_pixels)
+
+    palette = list(p.getpalette())
+    # Ensure palette is long enough and zero out the transparency slot
+    while len(palette) < (n_colors) * 3:
+        palette.extend([0, 0, 0])
+    palette[trans_index * 3: trans_index * 3 + 3] = [0, 0, 0]
+    result.putpalette(palette)
+
+    return result, trans_index
+
+
 def build_gif(
     frames_rgba: list,
     output_path: Path,
     fps: int,
     loop: int,
-    bg_color: tuple,
+    n_colors: int = 64,
 ) -> None:
     frame_duration_ms = max(20, round(1000 / fps))
 
-    # Convert RGBA frames to P-mode (palette) with transparency
     palette_frames = []
+    trans_index = None
     for frame in frames_rgba:
-        # Composite onto white matte so semi-transparent edges look clean
-        matte = Image.new("RGBA", frame.size, (255, 255, 255, 255))
-        matte.paste(frame, mask=frame.split()[3])          # alpha channel
-        p_frame = matte.convert("RGB").quantize(colors=255, dither=Image.Dither.FLOYDSTEINBERG)
+        p_frame, trans_index = _rgba_to_p(frame, n_colors)
         palette_frames.append(p_frame)
 
     palette_frames[0].save(
@@ -138,6 +166,8 @@ def build_gif(
         duration=frame_duration_ms,
         loop=loop,
         optimize=True,
+        transparency=trans_index,
+        disposal=2,          # clear to background between frames
     )
 
 
@@ -177,6 +207,8 @@ def main() -> None:
                         help="Rotation direction: cw (clockwise) or ccw. Default: cw")
     parser.add_argument("--loop",     type=int,   default=0,
                         help="Number of loops (0 = infinite). Default: 0")
+    parser.add_argument("--colors",   type=int,   default=64,
+                        help="Palette size (2-256). Fewer = smaller file. Default: 64")
 
     args = parser.parse_args()
 
@@ -224,14 +256,17 @@ def main() -> None:
     for i in range(total_frames):
         fraction = i / total_frames                        # 0.0 → 1.0
         angle = fraction * 360.0
-        if args.direction == "ccw":
+        # PIL rotate() is counter-clockwise for positive angles;
+        # negate for clockwise.
+        if args.direction == "cw":
             angle = -angle
         frame = make_frame(img, angle, size, bg_color)
         frames.append(frame)
 
     # ---- Save GIF ----------------------------------------------------------
     print(f"  Saving GIF → {output_path}")
-    build_gif(frames, output_path, fps=args.fps, loop=args.loop, bg_color=bg_color)
+    n_colors = max(2, min(256, args.colors))
+    build_gif(frames, output_path, fps=args.fps, loop=args.loop, n_colors=n_colors)
 
     size_kb = output_path.stat().st_size / 1024
     print(f"\nDone! {output_path}  ({size_kb:.1f} KB, {total_frames} frames)")
