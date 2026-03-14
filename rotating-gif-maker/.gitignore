@@ -8,3 +8,4 @@ output/*
 !output/.gitkeep
 # Track the live signature GIF
 !output/theaismartflow_logo2_rotating.gif
+!output/signal_face_rotating.gif
