@@ -183,7 +183,10 @@ def crop_interactive(img: Image.Image) -> Image.Image:
 # ---------------------------------------------------------------------------
 
 def apply_circular_mask(img: Image.Image, feather: int = 2) -> Image.Image:
-    """Crop image to a circle with a softly feathered edge."""
+    """Crop image to a circle with a softly feathered edge.
+    Multiplies the existing alpha (from rembg / gradient fade) with the
+    circle mask so prior transparency is preserved, not overwritten."""
+    import numpy as np
     img = img.convert("RGBA")
     size = min(img.size)
     img = img.crop(((img.width - size) // 2,
@@ -194,7 +197,11 @@ def apply_circular_mask(img: Image.Image, feather: int = 2) -> Image.Image:
     ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
     if feather > 0:
         mask = mask.filter(ImageFilter.GaussianBlur(feather))
-    img.putalpha(mask)
+    # Multiply existing alpha by circle mask instead of replacing it
+    existing = np.array(img.split()[3], dtype=np.float32)
+    circle   = np.array(mask, dtype=np.float32)
+    combined = (existing * circle / 255.0).clip(0, 255).astype(np.uint8)
+    img.putalpha(Image.fromarray(combined))
     return img
 
 
