@@ -12,11 +12,11 @@ Usage:
 """
 
 import argparse
-import math
+import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
 
 # ---------------------------------------------------------------------------
@@ -112,23 +112,66 @@ def make_frame(
 # GIF assembly
 # ---------------------------------------------------------------------------
 
+def _build_global_palette(frames_rgba: list, n_colors: int) -> Image.Image:
+    """
+    Sample every frame and derive a single shared palette.
+    A global palette lets LZW compress far more efficiently across frames.
+    """
+    # Tile a subset of frames side-by-side so quantize sees all colours at once
+    step = max(1, len(frames_rgba) // 8)          # sample up to 8 frames
+    samples = [f.convert("RGB") for f in frames_rgba[::step]]
+    w, h = samples[0].size
+    combined = Image.new("RGB", (w * len(samples), h))
+    for i, s in enumerate(samples):
+        combined.paste(s, (i * w, 0))
+    # Reserve one slot for the transparency colour
+    return combined.quantize(colors=n_colors - 1, dither=0)
+
+
+def _apply_palette(frame_rgba: Image.Image,
+                   palette_img: Image.Image,
+                   trans_index: int) -> Image.Image:
+    """Map an RGBA frame onto the global palette; transparent pixels → trans_index."""
+    r, g, b, a = frame_rgba.split()
+    rgb = Image.merge("RGB", (r, g, b))
+
+    # No dithering: solid colour runs → much better LZW compression
+    p = rgb.quantize(palette=palette_img, dither=0)
+
+    p_pixels = bytearray(p.tobytes())
+    a_pixels = a.tobytes()
+    for i, av in enumerate(a_pixels):
+        if av < 128:
+            p_pixels[i] = trans_index
+
+    result = Image.new("P", frame_rgba.size)
+    result.frombytes(bytes(p_pixels))
+
+    pal = list(p.getpalette())
+    while len(pal) < (trans_index + 1) * 3:
+        pal.extend([0, 0, 0])
+    pal[trans_index * 3: trans_index * 3 + 3] = [0, 0, 0]
+    result.putpalette(pal)
+    return result
+
+
 def build_gif(
     frames_rgba: list,
     output_path: Path,
     fps: int,
     loop: int,
-    bg_color: tuple,
+    n_colors: int = 32,
+    lossy: int = 30,
 ) -> None:
     frame_duration_ms = max(20, round(1000 / fps))
+    trans_index = n_colors - 1
 
-    # Convert RGBA frames to P-mode (palette) with transparency
-    palette_frames = []
-    for frame in frames_rgba:
-        # Composite onto white matte so semi-transparent edges look clean
-        matte = Image.new("RGBA", frame.size, (255, 255, 255, 255))
-        matte.paste(frame, mask=frame.split()[3])          # alpha channel
-        p_frame = matte.convert("RGB").quantize(colors=255, dither=Image.Dither.FLOYDSTEINBERG)
-        palette_frames.append(p_frame)
+    print("  Building global palette…")
+    palette_img = _build_global_palette(frames_rgba, n_colors)
+
+    print("  Quantizing frames…")
+    palette_frames = [_apply_palette(f, palette_img, trans_index)
+                      for f in frames_rgba]
 
     palette_frames[0].save(
         output_path,
@@ -138,7 +181,33 @@ def build_gif(
         duration=frame_duration_ms,
         loop=loop,
         optimize=True,
+        transparency=trans_index,
+        disposal=2,
     )
+
+    # Post-process with gifsicle if available — typically saves 40-70 % more
+    gifsicle = _find_gifsicle()
+    if gifsicle:
+        print(f"  Running gifsicle --optimize=3 --lossy={lossy}…")
+        tmp = output_path.with_suffix(".tmp.gif")
+        output_path.rename(tmp)
+        result = subprocess.run(
+            [gifsicle, "--optimize=3", f"--lossy={lossy}",
+             "-o", str(output_path), str(tmp)],
+            capture_output=True,
+        )
+        tmp.unlink(missing_ok=True)
+        if result.returncode != 0:
+            # Fallback: just keep the unoptimized version
+            output_path.rename(tmp)
+            tmp.rename(output_path)
+    else:
+        print("  [tip] Install gifsicle for an extra 40-70% size reduction.")
+
+
+def _find_gifsicle() -> str | None:
+    import shutil
+    return shutil.which("gifsicle")
 
 
 # ---------------------------------------------------------------------------
@@ -157,8 +226,8 @@ def main() -> None:
                         help="Crop a W×H region from the centre of the image")
     parser.add_argument("--interactive-crop", action="store_true",
                         help="Interactively enter a crop region")
-    parser.add_argument("--size",   type=int, default=200,
-                        help="Final canvas size in pixels (square). Default: 200")
+    parser.add_argument("--size",   type=int, default=80,
+                        help="Final canvas size in pixels (square). Default: 80")
     parser.add_argument("--circle", action="store_true",
                         help="Apply a circular mask to the image")
 
@@ -169,14 +238,18 @@ def main() -> None:
                         help="Use a solid white background instead of transparent")
 
     # Animation
-    parser.add_argument("--fps",      type=int,   default=24,
-                        help="Frames per second. Default: 24")
+    parser.add_argument("--fps",      type=int,   default=12,
+                        help="Frames per second. Default: 12")
     parser.add_argument("--duration", type=float, default=2.0,
                         help="Duration of one full rotation in seconds. Default: 2.0")
     parser.add_argument("--direction", choices=["cw", "ccw"], default="cw",
                         help="Rotation direction: cw (clockwise) or ccw. Default: cw")
     parser.add_argument("--loop",     type=int,   default=0,
                         help="Number of loops (0 = infinite). Default: 0")
+    parser.add_argument("--colors",   type=int,   default=32,
+                        help="Palette size (2-256). Fewer = smaller file. Default: 32")
+    parser.add_argument("--lossy",    type=int,   default=30,
+                        help="gifsicle lossy level (0=lossless, 80=aggressive). Default: 30")
 
     args = parser.parse_args()
 
@@ -224,14 +297,18 @@ def main() -> None:
     for i in range(total_frames):
         fraction = i / total_frames                        # 0.0 → 1.0
         angle = fraction * 360.0
-        if args.direction == "ccw":
+        # PIL rotate() is counter-clockwise for positive angles;
+        # negate for clockwise.
+        if args.direction == "cw":
             angle = -angle
         frame = make_frame(img, angle, size, bg_color)
         frames.append(frame)
 
     # ---- Save GIF ----------------------------------------------------------
     print(f"  Saving GIF → {output_path}")
-    build_gif(frames, output_path, fps=args.fps, loop=args.loop, bg_color=bg_color)
+    n_colors = max(2, min(256, args.colors))
+    build_gif(frames, output_path, fps=args.fps, loop=args.loop,
+              n_colors=n_colors, lossy=args.lossy)
 
     size_kb = output_path.stat().st_size / 1024
     print(f"\nDone! {output_path}  ({size_kb:.1f} KB, {total_frames} frames)")
