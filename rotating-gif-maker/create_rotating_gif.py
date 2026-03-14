@@ -90,15 +90,47 @@ def extract_face(img: Image.Image) -> Image.Image | None:
         rgba = crop.convert("RGBA")
 
     # ---- Expand to exact square centered on face -------------------------
-    # Clamping above may have made the crop non-square or off-center.
-    # Paste the rembg result onto a transparent square canvas so the face
-    # center lands exactly at canvas center regardless of image boundaries.
     canvas_size = half * 2
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     paste_x = half - (cx - x1)
     paste_y = half - (cy - y1)
     canvas.paste(rgba, (paste_x, paste_y))
-    return canvas
+
+    # ---- Gradient fade to remove artifacts outside the face region -------
+    # Face bbox in canvas coordinates
+    face_top    = (fy - y1) + paste_y
+    face_bottom = (fy + fh - y1) + paste_y
+
+    # Fade zone above: full opacity at (face_top - 5%fh), transparent at (face_top - 40%fh)
+    # Removes fingers / arms sitting above the hair.
+    fade_top_opaque = face_top - int(fh * 0.05)
+    fade_top_clear  = face_top - int(fh * 0.40)
+
+    # Fade zone below: full opacity at (face_bottom + 8%fh), transparent at (face_bottom + 25%fh)
+    # Removes the hard diagonal edge where the image boundary cuts through the neck.
+    fade_bot_opaque = face_bottom + int(fh * 0.08)
+    fade_bot_clear  = face_bottom + int(fh * 0.25)
+
+    import numpy as np
+    arr = np.array(canvas, dtype=np.float32)
+    h_c = arr.shape[0]
+    mult = np.ones(h_c, dtype=np.float32)
+
+    # Top fade
+    t0, t1 = max(0, fade_top_clear), max(0, fade_top_opaque)
+    if t1 > t0:
+        mult[:t0] = 0.0
+        mult[t0:t1] = np.linspace(0.0, 1.0, t1 - t0)
+
+    # Bottom fade
+    b0 = min(h_c, fade_bot_opaque)
+    b1 = min(h_c, fade_bot_clear)
+    if b1 > b0:
+        mult[b0:b1] = np.linspace(1.0, 0.0, b1 - b0)
+        mult[b1:] = 0.0
+
+    arr[:, :, 3] *= mult[:, np.newaxis]
+    return Image.fromarray(arr.astype(np.uint8))
 
 
 # ---------------------------------------------------------------------------
