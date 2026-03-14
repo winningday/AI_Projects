@@ -51,63 +51,64 @@ def detect_face(img: Image.Image):
 
 def extract_face(img: Image.Image) -> Image.Image | None:
     """
-    Auto-detects a face, smart-crops to it, then runs rembg with the
-    portrait-optimised isnet-general-use model to remove the background
-    and any stray hands/arms. Returns an RGBA image or None if no face found.
+    Auto-detects a face, removes the background, and isolates just the head
+    (face + hair + neck) — excluding arms, hands, other people, etc.
 
-    Strategy: use a TIGHT crop for rembg (physically excludes fingers/arms)
-    then place the result on a WIDER canvas for the circle mask. No alpha
-    gradients — GIF only supports binary transparency so gradients produce
-    visible horizontal lines.
+    Strategy (two masks, intersected):
+      1. rembg on the full image → removes the actual BACKGROUND (walls, etc.)
+      2. Elliptical head mask from face bbox → removes any FOREGROUND body parts
+         (arms/fingers) that rembg kept but are outside the head silhouette.
+      3. min(rembg_alpha, ellipse) = clean head, no fingers, no background.
+
+    No alpha gradients — GIF only supports binary transparency.
     """
     face = detect_face(img)
     if face is None:
         return None
 
+    import cv2
+    import numpy as np
+
     fx, fy, fw, fh = face
     w, h = img.size
+    cx, cy = fx + fw // 2, fy + fh // 2
     print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
 
-    cx = fx + fw // 2
-    cy = fy + fh // 2
-
-    # --- TIGHT crop for rembg ------------------------------------------
-    # Excludes fingers/arms above the head by using conservative top padding.
-    # rembg then only needs to separate face from the remaining background.
-    pad_top    = int(fh * 0.30)   # just enough for hair, not enough for arms
-    pad_side   = int(fw * 0.15)
-    pad_bottom = int(fh * 0.20)   # enough for chin + some neck
-    cx1 = max(0, fx - pad_side)
-    cy1 = max(0, fy - pad_top)
-    cx2 = min(w, fx + fw + pad_side)
-    cy2 = min(h, fy + fh + pad_bottom)
-    crop = img.crop((cx1, cy1, cx2, cy2))
-    print(f"  Tight crop: ({cx1},{cy1})→({cx2},{cy2}) = {cx2-cx1}×{cy2-cy1}")
-
-    # rembg with isnet-general-use — best accuracy for portraits
+    # --- rembg on full image (full context = best segmentation) --------
     try:
         from rembg import remove, new_session
         print("  Removing background (isnet-general-use)…")
         session = new_session("isnet-general-use")
-        rgba = remove(crop, session=session)
+        rgba = remove(img.convert("RGB"), session=session)
     except ImportError:
-        print("  [warn] rembg not installed — using cropped image without bg removal.")
-        rgba = crop.convert("RGBA")
+        print("  [warn] rembg not installed — skipping background removal.")
+        rgba = img.convert("RGBA")
 
-    # --- WIDE canvas for the circle ------------------------------------
-    # Place the rembg result centered on the face so the circle mask
-    # has equal breathing room on all sides. Transparent padding fills
-    # any areas outside the original image — no hard edges.
+    rembg_alpha = np.array(rgba.split()[3])
+
+    # --- Elliptical head mask ------------------------------------------
+    # Shaped to match a head: wide enough for ears/hair, tall for hair + neck.
+    # The intersection with rembg clips arms/fingers that extend beyond
+    # the head silhouette while keeping the face, hair, and neck.
+    ell_a = int(fw * 0.58)    # horizontal semi-axis (ears + hair sides)
+    ell_b = int(fh * 0.82)    # vertical semi-axis  (hair top + neck bottom)
+    ellipse_mask = np.zeros((h, w), dtype=np.uint8)
+    cv2.ellipse(ellipse_mask, center=(cx, cy),
+                axes=(ell_a, ell_b), angle=0,
+                startAngle=0, endAngle=360,
+                color=255, thickness=-1)
+    print(f"  Head ellipse: center=({cx},{cy}) axes=({ell_a},{ell_b})")
+
+    # --- Intersect: rembg handles bg, ellipse handles stray body parts --
+    combined_alpha = np.minimum(rembg_alpha, ellipse_mask)
+    result = rgba.copy()
+    result.putalpha(Image.fromarray(combined_alpha))
+
+    # --- Place on square canvas centered on face -----------------------
     half_canvas = int(fh * 0.85)
     canvas_size = half_canvas * 2
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    # Where does the face center land inside the rembg crop?
-    face_in_crop_x = cx - cx1
-    face_in_crop_y = cy - cy1
-    # Place so face center = canvas center
-    paste_x = half_canvas - face_in_crop_x
-    paste_y = half_canvas - face_in_crop_y
-    canvas.paste(rgba, (paste_x, paste_y))
+    canvas.paste(result, (half_canvas - cx, half_canvas - cy))
     return canvas
 
 
