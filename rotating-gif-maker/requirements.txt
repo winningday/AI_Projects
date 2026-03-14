@@ -1,0 +1,3 @@
+Pillow>=10.0.0
+rembg>=2.0.50        # optional – needed for --remove-bg
+onnxruntime>=1.16.0  # required by rembg
