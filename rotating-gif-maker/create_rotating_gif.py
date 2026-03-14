@@ -54,6 +54,11 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     Auto-detects a face, smart-crops to it, then runs rembg with the
     portrait-optimised isnet-general-use model to remove the background
     and any stray hands/arms. Returns an RGBA image or None if no face found.
+
+    Strategy: use a TIGHT crop for rembg (physically excludes fingers/arms)
+    then place the result on a WIDER canvas for the circle mask. No alpha
+    gradients — GIF only supports binary transparency so gradients produce
+    visible horizontal lines.
     """
     face = detect_face(img)
     if face is None:
@@ -63,74 +68,47 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     w, h = img.size
     print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
 
-    # Face center with a small upward nudge so hair gets slightly more
-    # room than chin/neck (typical headshot framing).
     cx = fx + fw // 2
-    cy = fy + fh // 2 - int(fh * 0.05)
+    cy = fy + fh // 2
 
-    # half = 95% of face height → 40% breathing room on every side of the face.
-    # This is the radius of the final square; the circle will fill it perfectly.
-    half = int(fh * 0.95)
+    # --- TIGHT crop for rembg ------------------------------------------
+    # Excludes fingers/arms above the head by using conservative top padding.
+    # rembg then only needs to separate face from the remaining background.
+    pad_top    = int(fh * 0.30)   # just enough for hair, not enough for arms
+    pad_side   = int(fw * 0.15)
+    pad_bottom = int(fh * 0.20)   # enough for chin + some neck
+    cx1 = max(0, fx - pad_side)
+    cy1 = max(0, fy - pad_top)
+    cx2 = min(w, fx + fw + pad_side)
+    cy2 = min(h, fy + fh + pad_bottom)
+    crop = img.crop((cx1, cy1, cx2, cy2))
+    print(f"  Tight crop: ({cx1},{cy1})→({cx2},{cy2}) = {cx2-cx1}×{cy2-cy1}")
 
-    # Clamp to image bounds for rembg (rembg wants real pixels, not padding).
-    x1 = max(0, cx - half)
-    y1 = max(0, cy - half)
-    x2 = min(w, cx + half)
-    y2 = min(h, cy + half)
-    crop = img.crop((x1, y1, x2, y2))
-
-    # rembg with isnet-general-use — best accuracy for portraits with occlusion
+    # rembg with isnet-general-use — best accuracy for portraits
     try:
         from rembg import remove, new_session
         print("  Removing background (isnet-general-use)…")
         session = new_session("isnet-general-use")
         rgba = remove(crop, session=session)
     except ImportError:
-        print("  [warn] rembg not installed — returning cropped image without bg removal.")
+        print("  [warn] rembg not installed — using cropped image without bg removal.")
         rgba = crop.convert("RGBA")
 
-    # ---- Expand to exact square centered on face -------------------------
-    canvas_size = half * 2
+    # --- WIDE canvas for the circle ------------------------------------
+    # Place the rembg result centered on the face so the circle mask
+    # has equal breathing room on all sides. Transparent padding fills
+    # any areas outside the original image — no hard edges.
+    half_canvas = int(fh * 0.85)
+    canvas_size = half_canvas * 2
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    paste_x = half - (cx - x1)
-    paste_y = half - (cy - y1)
+    # Where does the face center land inside the rembg crop?
+    face_in_crop_x = cx - cx1
+    face_in_crop_y = cy - cy1
+    # Place so face center = canvas center
+    paste_x = half_canvas - face_in_crop_x
+    paste_y = half_canvas - face_in_crop_y
     canvas.paste(rgba, (paste_x, paste_y))
-
-    # ---- Gradient fade to remove artifacts outside the face region -------
-    # Face bbox in canvas coordinates
-    face_top    = (fy - y1) + paste_y
-    face_bottom = (fy + fh - y1) + paste_y
-
-    # Fade zone above: full opacity at (face_top - 5%fh), transparent at (face_top - 40%fh)
-    # Removes fingers / arms sitting above the hair.
-    fade_top_opaque = face_top - int(fh * 0.05)
-    fade_top_clear  = face_top - int(fh * 0.40)
-
-    # Fade zone below: full opacity at (face_bottom + 8%fh), transparent at (face_bottom + 25%fh)
-    # Removes the hard diagonal edge where the image boundary cuts through the neck.
-    fade_bot_opaque = face_bottom + int(fh * 0.08)
-    fade_bot_clear  = face_bottom + int(fh * 0.25)
-
-    import numpy as np
-    arr = np.array(canvas, dtype=np.float32)
-    h_c = arr.shape[0]
-    mult = np.ones(h_c, dtype=np.float32)
-
-    # Top fade
-    t0, t1 = max(0, fade_top_clear), max(0, fade_top_opaque)
-    if t1 > t0:
-        mult[:t0] = 0.0
-        mult[t0:t1] = np.linspace(0.0, 1.0, t1 - t0)
-
-    # Bottom fade
-    b0 = min(h_c, fade_bot_opaque)
-    b1 = min(h_c, fade_bot_clear)
-    if b1 > b0:
-        mult[b0:b1] = np.linspace(1.0, 0.0, b1 - b0)
-        mult[b1:] = 0.0
-
-    arr[:, :, 3] *= mult[:, np.newaxis]
-    return Image.fromarray(arr.astype(np.uint8))
+    return canvas
 
 
 # ---------------------------------------------------------------------------
