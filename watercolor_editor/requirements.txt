@@ -1,0 +1,44 @@
+# ──────────────────────────────────────────────
+# Watercolor Class Video Editor — Dependencies
+# ──────────────────────────────────────────────
+
+# Core vision & video
+opencv-python>=4.9.0
+numpy>=1.26.0
+
+# MediaPipe for hand/pose detection (Stage 1A)
+# Optional but strongly recommended — falls back to background subtraction
+mediapipe>=0.10.0
+
+# Whisper for Chinese speech recognition (Stage 1C)
+# Install separately: pip install openai-whisper
+# Also requires: pip install torch (CPU or GPU build)
+openai-whisper>=20231117
+
+# Anthropic SDK for Claude classification + translation (Stage 1C)
+anthropic>=0.34.0
+
+# Audio processing for sync (Stage 0)
+# librosa is optional — we use FFmpeg + numpy for cross-correlation
+# but librosa is useful for debugging and inspection
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Utilities
+tqdm>=4.66.0        # Progress bars for long analysis passes
+rich>=13.0.0        # Pretty CLI output
+
+# ──────────────────────────────────────────────
+# System dependencies (install separately):
+#
+#   FFmpeg (with libx264 support):
+#     Ubuntu/Debian: sudo apt install ffmpeg
+#     macOS:         brew install ffmpeg
+#     Windows:       https://ffmpeg.org/download.html
+#
+#   For GPU-accelerated Whisper (optional):
+#     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+#   For CPU-only Whisper:
+#     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# ──────────────────────────────────────────────
