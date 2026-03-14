@@ -6,3 +6,5 @@ input/*
 output/*
 !input/.gitkeep
 !output/.gitkeep
+# Track the live signature GIF
+!output/theaismartflow_logo2_rotating.gif
