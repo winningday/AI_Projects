@@ -63,13 +63,16 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     w, h = img.size
     print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
 
-    # Square crop centered on the face center.
-    # Shift the center point UP by 10% so the circle gives more room below
-    # the chin than above (hair needs less room than chin + neck).
+    # Face center with a small upward nudge so hair gets slightly more
+    # room than chin/neck (typical headshot framing).
     cx = fx + fw // 2
-    cy = fy + fh // 2 - int(fh * 0.10)
-    # half-side: 75% of face height in every direction from center
-    half = int(fh * 0.75)
+    cy = fy + fh // 2 - int(fh * 0.05)
+
+    # half = 95% of face height → 40% breathing room on every side of the face.
+    # This is the radius of the final square; the circle will fill it perfectly.
+    half = int(fh * 0.95)
+
+    # Clamp to image bounds for rembg (rembg wants real pixels, not padding).
     x1 = max(0, cx - half)
     y1 = max(0, cy - half)
     x2 = min(w, cx + half)
@@ -86,7 +89,16 @@ def extract_face(img: Image.Image) -> Image.Image | None:
         print("  [warn] rembg not installed — returning cropped image without bg removal.")
         rgba = crop.convert("RGBA")
 
-    return rgba
+    # ---- Expand to exact square centered on face -------------------------
+    # Clamping above may have made the crop non-square or off-center.
+    # Paste the rembg result onto a transparent square canvas so the face
+    # center lands exactly at canvas center regardless of image boundaries.
+    canvas_size = half * 2
+    canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    paste_x = half - (cx - x1)
+    paste_y = half - (cy - y1)
+    canvas.paste(rgba, (paste_x, paste_y))
+    return canvas
 
 
 # ---------------------------------------------------------------------------
