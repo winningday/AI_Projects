@@ -63,14 +63,17 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     w, h = img.size
     print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
 
-    # Tight top padding — just enough for hair, avoids grabbing arms above head
-    pad_top    = int(fh * 0.35)
-    pad_side   = int(fw * 0.18)
-    pad_bottom = int(fh * 0.12)
-    x1 = max(0, fx - pad_side)
-    y1 = max(0, fy - pad_top)
-    x2 = min(w, fx + fw + pad_side)
-    y2 = min(h, fy + fh + pad_bottom)
+    # Square crop centered on the face center.
+    # Shift the center point UP by 10% so the circle gives more room below
+    # the chin than above (hair needs less room than chin + neck).
+    cx = fx + fw // 2
+    cy = fy + fh // 2 - int(fh * 0.10)
+    # half-side: 75% of face height in every direction from center
+    half = int(fh * 0.75)
+    x1 = max(0, cx - half)
+    y1 = max(0, cy - half)
+    x2 = min(w, cx + half)
+    y2 = min(h, cy + half)
     crop = img.crop((x1, y1, x2, y2))
 
     # rembg with isnet-general-use — best accuracy for portraits with occlusion
@@ -302,8 +305,8 @@ def main() -> None:
                         help="Crop a W×H region from the centre of the image")
     parser.add_argument("--interactive-crop", action="store_true",
                         help="Interactively enter a crop region")
-    parser.add_argument("--size",   type=int, default=100,
-                        help="Final canvas size in pixels (square). Default: 100")
+    parser.add_argument("--size",   type=int, default=120,
+                        help="Final canvas size in pixels (square). Default: 120")
     parser.add_argument("--circle", action="store_true",
                         help="Apply a circular mask to the image")
 
@@ -322,10 +325,10 @@ def main() -> None:
                         help="Rotation direction: cw (clockwise) or ccw. Default: cw")
     parser.add_argument("--loop",     type=int,   default=0,
                         help="Number of loops (0 = infinite). Default: 0")
-    parser.add_argument("--colors",   type=int,   default=32,
-                        help="Palette size (2-256). Fewer = smaller file. Default: 32")
-    parser.add_argument("--lossy",    type=int,   default=30,
-                        help="gifsicle lossy level (0=lossless, 80=aggressive). Default: 30")
+    parser.add_argument("--colors",   type=int,   default=128,
+                        help="Palette size (2-256). Fewer = smaller file. Default: 128")
+    parser.add_argument("--lossy",    type=int,   default=10,
+                        help="gifsicle lossy level (0=lossless, 80=aggressive). Default: 10")
 
     args = parser.parse_args()
 
