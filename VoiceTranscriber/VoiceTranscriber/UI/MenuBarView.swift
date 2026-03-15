@@ -173,10 +173,9 @@ struct MenuBarView: View {
             // Bottom buttons
             VStack(spacing: 2) {
                 MenuButton(
-                    icon: "gear",
-                    label: "Settings...",
-                    shortcut: "⌘,",
-                    action: { appState.showSettings() }
+                    icon: "macwindow",
+                    label: "Open VoiceTranscriber",
+                    action: { appState.showMainWindow() }
                 )
 
                 MenuButton(

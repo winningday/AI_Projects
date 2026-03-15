@@ -1,6 +1,7 @@
 import Foundation
 
 /// Client for the Anthropic Claude API, used for cleaning up raw transcriptions.
+/// Supports dictionary words, style profiles, context awareness, and smart formatting.
 final class ClaudeClient {
     private let baseURL = "https://api.anthropic.com/v1/messages"
     private let session: URLSession
@@ -11,26 +12,49 @@ final class ClaudeClient {
     }
 
     /// Cleans up a raw voice transcription using Claude Haiku.
-    /// - Parameter rawText: The raw transcription from Whisper
-    /// - Returns: Cleaned text with filler words removed and corrections applied
-    func cleanTranscription(_ rawText: String) async throws -> String {
+    /// - Parameters:
+    ///   - rawText: The raw transcription from Whisper
+    ///   - dictionaryWords: Custom words/names the user has added
+    ///   - styleTone: The style tone to apply based on the active app context
+    ///   - activeApp: Name of the currently focused application
+    ///   - contextText: Surrounding text from the active text field
+    ///   - smartFormatting: Whether to apply smart code/technical formatting
+    /// - Returns: Cleaned text with corrections, style, and formatting applied
+    func cleanTranscription(
+        _ rawText: String,
+        dictionaryWords: [String] = [],
+        styleTone: StyleTone = .formal,
+        activeApp: String? = nil,
+        contextText: String? = nil,
+        smartFormatting: Bool = true
+    ) async throws -> String {
         guard let apiKey = ConfigManager.shared.claudeAPIKey, !apiKey.isEmpty else {
             throw ClaudeError.missingAPIKey
         }
 
-        // Don't process very short or empty text
         let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard !trimmed.isEmpty else { return trimmed }
+
+        // For very short text (< 5 words), skip Claude and return as-is with basic cleanup
+        let wordCount = trimmed.split(separator: " ").count
+        if wordCount <= 3 {
             return trimmed
         }
 
-        let prompt = buildCleanupPrompt(rawText: trimmed)
+        let systemPrompt = buildSystemPrompt(
+            dictionaryWords: dictionaryWords,
+            styleTone: styleTone,
+            activeApp: activeApp,
+            contextText: contextText,
+            smartFormatting: smartFormatting
+        )
 
-        let requestBody = ClaudeRequest(
+        let requestBody = ClaudeRequestWithSystem(
             model: modelID,
             max_tokens: 4096,
+            system: systemPrompt,
             messages: [
-                ClaudeMessage(role: "user", content: prompt)
+                ClaudeMessage(role: "user", content: trimmed)
             ]
         )
 
@@ -63,37 +87,88 @@ final class ClaudeClient {
         return textBlock.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // MARK: - Prompt
+    // MARK: - System Prompt Builder
 
-    private func buildCleanupPrompt(rawText: String) -> String {
+    private func buildSystemPrompt(
+        dictionaryWords: [String],
+        styleTone: StyleTone,
+        activeApp: String?,
+        contextText: String?,
+        smartFormatting: Bool
+    ) -> String {
+        var prompt = """
+        You are a real-time voice transcription processor. You receive raw speech-to-text output and return clean, polished text ready to be inserted into a document or message field.
+
+        CORE RULES (always apply):
+        - Remove filler words: "um", "uh", "like", "you know", "I mean", "so", "basically" (only when used as fillers, not when meaningful)
+        - Fix self-corrections: keep only the final intended version. "I want to go to the store, no wait, the park" → "I want to go to the park"
+        - Fix stuttering/repeats: "I-I-I think" → "I think"
+        - Fix obvious transcription errors (homophones, garbled words) using context
+        - Keep contractions natural
+        - Detect numbered lists from speech: "first apples second bananas" → "1. Apples\\n2. Bananas"
+        - If the text is very short or a single word/phrase, return it with minimal changes
+        - Output ONLY the cleaned text. No explanations, no markers, no quotes.
         """
-        You are a voice transcription cleaner. Your job is to fix common speech patterns WITHOUT changing meaning.
 
-        Rules:
-        1. Remove filler words and false starts: "um", "uh", "like", "you know", "I mean" (unless essential to meaning)
-        2. Detect self-corrections and use only the corrected version. Example: "I want to go to the store, no wait, I want to go to the park" → "I want to go to the park"
-        3. Fix repeated words from stuttering: "I-I-I think" → "I think"
-        4. Keep contractions natural: "I'm", "don't", etc.
-        5. Preserve the speaker's tone and voice—don't over-formalize
-        6. If the user says items with numbers between them, such as "one apples, two bananas" and you can tell it's part of a list return as a list. ie:
-               1. Apples
-               2. Bananas
-        7. If the transcription is clearly incomplete or nonsensical, return it as-is with no changes
-        8. Output ONLY the cleaned text. No explanations, no markers, nothing else.
+        // Style instructions
+        prompt += "\n\nSTYLE: \(styleTone.promptInstructions)"
 
-        Raw transcription:
-        \(rawText)
+        // Dictionary words
+        if !dictionaryWords.isEmpty {
+            let words = dictionaryWords.prefix(50).joined(separator: ", ")
+            prompt += """
 
-        Cleaned output:
-        """
+            \nCUSTOM DICTIONARY (use these exact spellings when you hear these words or similar-sounding words):
+            \(words)
+            """
+        }
+
+        // Smart formatting
+        if smartFormatting {
+            prompt += """
+
+            \nSMART FORMATTING:
+            - If the user appears to be dictating code or technical content (function names, variable names, class names), preserve technical formatting: camelCase, snake_case, PascalCase as appropriate
+            - URLs, file paths, and technical terms should be formatted correctly
+            - Code snippets should be on their own lines
+            """
+        }
+
+        // Context awareness
+        if let app = activeApp {
+            prompt += "\n\nACTIVE APP: The user is typing in \"\(app)\". Adjust tone appropriately."
+
+            // App-specific hints
+            let appLower = app.lowercased()
+            if appLower.contains("slack") || appLower.contains("teams") || appLower.contains("discord") {
+                prompt += " This is a work messenger — keep it professional but concise."
+            } else if appLower.contains("message") || appLower.contains("whatsapp") || appLower.contains("telegram") {
+                prompt += " This is a personal messenger — keep it natural and conversational."
+            } else if appLower.contains("mail") || appLower.contains("outlook") || appLower.contains("gmail") {
+                prompt += " This is email — use proper email formatting."
+            } else if appLower.contains("xcode") || appLower.contains("vs code") || appLower.contains("visual studio") || appLower.contains("cursor") || appLower.contains("terminal") {
+                prompt += " This is a code editor — preserve technical terms, function names, and code formatting precisely."
+            }
+        }
+
+        if let context = contextText, !context.isEmpty {
+            prompt += """
+
+            \nCONTEXT (text already in the field — use for spelling names and understanding topic):
+            \"\(context)\"
+            """
+        }
+
+        return prompt
     }
 }
 
 // MARK: - Request/Response Models
 
-private struct ClaudeRequest: Encodable {
+private struct ClaudeRequestWithSystem: Encodable {
     let model: String
     let max_tokens: Int
+    let system: String
     let messages: [ClaudeMessage]
 }
 

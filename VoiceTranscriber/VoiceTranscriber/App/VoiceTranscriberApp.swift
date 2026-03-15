@@ -2,9 +2,28 @@ import SwiftUI
 import AppKit
 import Combine
 
+// MARK: - Navigation
+
+enum AppTab: String, CaseIterable, Identifiable {
+    case home = "Home"
+    case dictionary = "Dictionary"
+    case style = "Style"
+    case settings = "Settings"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .home: return "house"
+        case .dictionary: return "character.book.closed"
+        case .style: return "textformat"
+        case .settings: return "gear"
+        }
+    }
+}
+
 // MARK: - App State (Orchestrator)
 
-/// Central state object that coordinates recording, API calls, text injection, and UI.
 @MainActor
 final class AppState: ObservableObject {
     @Published var isRecording = false
@@ -12,7 +31,8 @@ final class AppState: ObservableObject {
     @Published var lastTranscript: Transcript?
     @Published var lastError: String?
     @Published var statusMessage: String = "Ready"
-    @Published var showOnboarding = false
+    @Published var selectedTab: AppTab = .home
+    @Published var totalWordsTranscribed: Int = 0
 
     let audioRecorder = AudioRecorder()
     let levelMonitor: AudioLevelMonitor
@@ -24,10 +44,20 @@ final class AppState: ObservableObject {
     private let claudeClient = ClaudeClient()
     private let recordingWindow = RecordingWindowController()
     private var cancellables = Set<AnyCancellable>()
+    /// Captured before recording starts for context-aware transcription
+    private var capturedContext: String?
+    private var capturedAppName: String?
 
     init() {
         self.levelMonitor = AudioLevelMonitor(recorder: audioRecorder)
         setupHotkeyCallbacks()
+        computeTotalWords()
+    }
+
+    private func computeTotalWords() {
+        totalWordsTranscribed = database.transcripts.reduce(0) {
+            $0 + $1.cleanedText.split(separator: " ").count
+        }
     }
 
     // MARK: - Hotkey Callbacks
@@ -51,6 +81,15 @@ final class AppState: ObservableObject {
     func startRecording() {
         guard !isRecording && !isProcessing else { return }
 
+        // Capture context BEFORE recording (while user is in their app)
+        if config.contextAwareness {
+            capturedContext = TextInjector.readContextFromActiveField()
+            capturedAppName = TextInjector.activeAppName()
+        } else {
+            capturedContext = nil
+            capturedAppName = TextInjector.activeAppName()
+        }
+
         AudioRecorder.requestMicrophonePermission { [weak self] granted in
             guard granted else {
                 Task { @MainActor [weak self] in
@@ -64,7 +103,7 @@ final class AppState: ObservableObject {
                 guard let self = self else { return }
 
                 do {
-                    let url = try self.audioRecorder.startRecording()
+                    let _ = try self.audioRecorder.startRecording()
                     self.isRecording = true
                     self.lastError = nil
                     self.statusMessage = "Recording..."
@@ -101,8 +140,11 @@ final class AppState: ObservableObject {
             NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         }
 
+        let context = capturedContext
+        let appName = capturedAppName
+
         Task {
-            await processRecording(url: result.url, duration: result.duration)
+            await processRecording(url: result.url, duration: result.duration, contextText: context, activeApp: appName)
         }
     }
 
@@ -117,14 +159,19 @@ final class AppState: ObservableObject {
 
     // MARK: - Processing Pipeline
 
-    private func processRecording(url: URL, duration: TimeInterval) async {
+    private func processRecording(url: URL, duration: TimeInterval, contextText: String?, activeApp: String?) async {
         defer {
             audioRecorder.cleanupTempFile(url: url)
         }
 
         do {
+            // Step 1: Transcribe with Whisper (+ dictionary words for accuracy)
             statusMessage = "Transcribing..."
-            let rawText = try await whisperClient.transcribe(fileURL: url)
+            let rawText = try await whisperClient.transcribe(
+                fileURL: url,
+                dictionaryWords: config.dictionaryWords,
+                contextHint: contextText
+            )
 
             guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 isProcessing = false
@@ -133,9 +180,21 @@ final class AppState: ObservableObject {
                 return
             }
 
-            statusMessage = "Cleaning up..."
-            let cleanedText = try await claudeClient.cleanTranscription(rawText)
+            // Step 2: Determine style based on active app
+            let styleTone = detectStyleTone(appName: activeApp)
 
+            // Step 3: Clean with Claude (dictionary, style, context, smart formatting)
+            statusMessage = "Cleaning up..."
+            let cleanedText = try await claudeClient.cleanTranscription(
+                rawText,
+                dictionaryWords: config.dictionaryWords,
+                styleTone: styleTone,
+                activeApp: activeApp,
+                contextText: config.contextAwareness ? contextText : nil,
+                smartFormatting: config.smartFormatting
+            )
+
+            // Step 4: Save
             let transcript = Transcript(
                 originalText: rawText,
                 cleanedText: cleanedText,
@@ -143,6 +202,7 @@ final class AppState: ObservableObject {
             )
             try database.save(transcript)
 
+            // Step 5: Inject text (APPENDS at cursor)
             if config.autoInjectText {
                 TextInjector.inject(text: cleanedText)
             }
@@ -151,6 +211,7 @@ final class AppState: ObservableObject {
             isProcessing = false
             statusMessage = "Ready"
             lastError = nil
+            computeTotalWords()
 
             if config.useHapticFeedback {
                 NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
@@ -163,48 +224,44 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Detect which style tone to use based on the active app
+    private func detectStyleTone(appName: String?) -> StyleTone {
+        guard let app = appName?.lowercased() else { return config.styleTone(for: .other) }
+
+        if app.contains("message") || app.contains("whatsapp") || app.contains("telegram") || app.contains("signal") {
+            return config.styleTone(for: .personalMessages)
+        } else if app.contains("slack") || app.contains("teams") || app.contains("discord") {
+            return config.styleTone(for: .workMessages)
+        } else if app.contains("mail") || app.contains("outlook") || app.contains("gmail") || app.contains("spark") {
+            return config.styleTone(for: .email)
+        }
+        return config.styleTone(for: .other)
+    }
+
     // MARK: - Navigation
 
     var hotkeyDescription: String {
         HotKeyManager.keyName(for: config.hotkeyKeyCode, modifiers: config.hotkeyModifiers)
     }
 
-    func showTranscriptHistory() {
+    func showMainWindow() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "history" }) {
+
+        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
             window.makeKeyAndOrderFront(nil)
         } else {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+                contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
                 styleMask: [.titled, .closable, .resizable, .miniaturizable],
                 backing: .buffered,
                 defer: false
             )
-            window.identifier = NSUserInterfaceItemIdentifier("history")
-            window.title = "Transcript History"
+            window.identifier = NSUserInterfaceItemIdentifier("main")
+            window.title = "VoiceTranscriber"
             window.center()
-            window.contentView = NSHostingView(rootView: TranscriptHistoryView(database: database))
-            window.makeKeyAndOrderFront(nil)
-        }
-    }
-
-    func showSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "settings" }) {
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 520, height: 400),
-                styleMask: [.titled, .closable],
-                backing: .buffered,
-                defer: false
-            )
-            window.identifier = NSUserInterfaceItemIdentifier("settings")
-            window.title = "VoiceTranscriber Settings"
-            window.center()
-            window.contentView = NSHostingView(
-                rootView: SettingsView(config: config, hotkeyManager: hotkeyManager)
-            )
+            window.minSize = NSSize(width: 700, height: 450)
+            window.contentView = NSHostingView(rootView: MainWindowView(appState: self))
             window.makeKeyAndOrderFront(nil)
         }
     }
@@ -230,6 +287,7 @@ final class AppState: ObservableObject {
                     onComplete: { [weak self] in
                         window.close()
                         self?.hotkeyManager.startListening()
+                        self?.showMainWindow()
                     }
                 )
             )
@@ -263,6 +321,7 @@ struct VoiceTranscriberApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
+        // Menu bar icon (always present)
         MenuBarExtra {
             MenuBarView(appState: appState)
         } label: {
@@ -274,9 +333,15 @@ struct VoiceTranscriberApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Settings {
-            SettingsView(config: appState.config, hotkeyManager: appState.hotkeyManager)
+        // Main app window
+        WindowGroup("VoiceTranscriber") {
+            MainWindowView(appState: appState)
+                .frame(minWidth: 700, minHeight: 450)
+                .onAppear {
+                    appState.appDidFinishLaunching()
+                }
         }
+        .defaultSize(width: 900, height: 600)
     }
 
     private var menuBarIcon: String {
@@ -290,6 +355,20 @@ struct VoiceTranscriberApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // AppState handles its own lifecycle via onAppear
+        // Show in dock so users can Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            // Re-open main window when dock icon is clicked and all windows are closed
+            for window in NSApp.windows {
+                if window.identifier?.rawValue == "main" {
+                    window.makeKeyAndOrderFront(nil)
+                    return true
+                }
+            }
+        }
+        return true
     }
 }

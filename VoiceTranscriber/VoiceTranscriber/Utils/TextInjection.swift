@@ -2,78 +2,34 @@ import Cocoa
 import Carbon
 
 /// Injects text into the currently focused text field of the active application.
-/// Uses the macOS Accessibility API with a pasteboard fallback.
+/// Always APPENDS at the current cursor position — never replaces existing content.
 final class TextInjector {
 
-    enum InjectionMethod {
-        case accessibility  // Preferred: uses AX API to set value directly
-        case pasteboard     // Fallback: copies to clipboard and simulates Cmd+V
-    }
-
-    /// Injects the given text into the currently active text field.
-    /// Tries accessibility API first, falls back to pasteboard-based injection.
+    /// Injects the given text at the current cursor position in the active text field.
+    /// Uses pasteboard + Cmd+V which naturally inserts at cursor without replacing.
     static func inject(text: String) {
-        // Try accessibility-based injection first
-        if injectViaAccessibility(text: text) {
-            return
-        }
-
-        // Fallback to pasteboard
+        // Always use pasteboard method — it reliably inserts at cursor
+        // without replacing existing content (unless user has a text selection,
+        // which is expected paste behavior)
         injectViaPasteboard(text: text)
-    }
-
-    // MARK: - Accessibility-Based Injection
-
-    private static func injectViaAccessibility(text: String) -> Bool {
-        guard let focusedApp = NSWorkspace.shared.frontmostApplication else { return false }
-
-        let appElement = AXUIElementCreateApplication(focusedApp.processIdentifier)
-
-        var focusedElement: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
-
-        guard result == .success else { return false }
-
-        let element = focusedElement as! AXUIElement
-
-        // Check if the element accepts text input
-        var role: AnyObject?
-        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
-
-        // Try to set the value directly
-        let setResult = AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, text as CFTypeRef)
-
-        if setResult == .success {
-            return true
-        }
-
-        // If direct value setting fails, try inserting at selection
-        var selectedRange: AnyObject?
-        let rangeResult = AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange)
-
-        if rangeResult == .success {
-            let insertResult = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
-            return insertResult == .success
-        }
-
-        return false
     }
 
     // MARK: - Pasteboard-Based Injection
 
     private static func injectViaPasteboard(text: String) {
-        // Save current clipboard contents
         let pasteboard = NSPasteboard.general
+
+        // Save current clipboard contents
         let previousContents = pasteboard.string(forType: .string)
 
-        // Set text to clipboard
+        // Set our text to clipboard
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 
         // Small delay to ensure pasteboard is ready
         usleep(50_000) // 50ms
 
-        // Simulate Cmd+V
+        // Simulate Cmd+V to paste at cursor position
         simulateKeyPress(keyCode: 9, flags: .maskCommand) // 'V' key
 
         // Restore previous clipboard after a delay
@@ -83,6 +39,42 @@ final class TextInjector {
                 pasteboard.setString(previous, forType: .string)
             }
         }
+    }
+
+    // MARK: - Context Reading (for context-aware transcription)
+
+    /// Reads surrounding text from the currently focused text field.
+    /// Used to provide context to the LLM for better transcription accuracy.
+    static func readContextFromActiveField() -> String? {
+        guard let focusedApp = NSWorkspace.shared.frontmostApplication else { return nil }
+
+        let appElement = AXUIElementCreateApplication(focusedApp.processIdentifier)
+
+        var focusedElement: AnyObject?
+        let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+        guard result == .success else { return nil }
+
+        let element = focusedElement as! AXUIElement
+
+        // Try to read current text value
+        var value: AnyObject?
+        let valueResult = AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
+
+        if valueResult == .success, let text = value as? String {
+            // Return last ~200 chars for context
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.count > 200 {
+                return String(trimmed.suffix(200))
+            }
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        return nil
+    }
+
+    /// Returns the name of the currently focused application.
+    static func activeAppName() -> String? {
+        NSWorkspace.shared.frontmostApplication?.localizedName
     }
 
     // MARK: - Key Simulation
