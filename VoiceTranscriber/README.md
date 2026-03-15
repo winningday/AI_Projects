@@ -41,6 +41,8 @@ English, Spanish, French, German, Italian, Portuguese, Chinese (Simplified), Jap
 git clone <repo-url>
 cd VoiceTranscriber
 ./build.sh release --dmg
+open .build/release/
+open .build/release/Verbalize-1.1.0.dmg
 ```
 
 This builds the app, generates the app icon from `icon.png`, and creates a DMG installer at `.build/release/Verbalize-1.1.0.dmg`.
