@@ -66,12 +66,9 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
     echo "==> Generating app icon from icon.png..."
     mkdir -p "${ICON_DIR}"
 
-    # The source is a 1380x752 banner — crop to center square using sips
+    # Source is already a 1024x1024 square PNG with transparent background
     TEMP="${ICON_DIR}/_source.png"
     cp "${SOURCE_ICON}" "${TEMP}"
-
-    # Crop to square (uses height as size, centered horizontally)
-    sips -c 752 752 "${TEMP}" --out "${TEMP}" >/dev/null 2>&1
 
     # Generate all required iconset sizes
     for size in 16 32 64 128 256 512 1024; do
