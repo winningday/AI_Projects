@@ -6,11 +6,11 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Status header with gradient
+            // Status header
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(statusColor.opacity(0.2))
+                        .fill(statusColor.opacity(0.15))
                         .frame(width: 32, height: 32)
                     Image(systemName: statusIcon)
                         .font(.system(size: 14, weight: .semibold))
@@ -27,7 +27,6 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                // Status badge
                 Text(statusBadge)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(statusColor)
@@ -104,7 +103,7 @@ struct MenuBarView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("LAST TRANSCRIPT")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary)
                         .tracking(0.5)
 
@@ -137,7 +136,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Hotkey info
+            // Hotkey info (dynamically updates)
             HStack(spacing: 6) {
                 Image(systemName: "keyboard")
                     .font(.system(size: 10))
@@ -168,6 +167,22 @@ struct MenuBarView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
+            // Translation indicator
+            if appState.config.translationEnabled {
+                HStack(spacing: 6) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 10))
+                        .foregroundColor(.blue)
+                    let langName = ConfigManager.supportedLanguages.first(where: { $0.code == appState.config.targetLanguage })?.name ?? appState.config.targetLanguage
+                    Text("Translating to \(langName)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.blue)
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 4)
+            }
+
             Divider()
 
             // Bottom buttons
@@ -190,7 +205,7 @@ struct MenuBarView: View {
                 MenuButton(
                     icon: "power",
                     label: "Quit VoiceTranscriber",
-                    shortcut: "⌘Q",
+                    shortcut: "\u{2318}Q",
                     action: { NSApplication.shared.terminate(nil) }
                 )
             }

@@ -1,122 +1,117 @@
 import SwiftUI
 
-/// Home tab showing welcome banner, stats, and recent transcript history.
+/// Home tab showing stats dashboard and recent transcript history.
 struct HomeView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Header with stats
-                HStack {
-                    Text("Welcome back")
-                        .font(.system(size: 26, weight: .bold))
-
-                    Spacer()
-
-                    HStack(spacing: 16) {
-                        StatBadge(icon: "text.word.spacing", value: formatWords(appState.totalWordsTranscribed), label: "words")
-                        StatBadge(icon: "number", value: "\(appState.database.transcripts.count)", label: "transcripts")
-                    }
+            VStack(alignment: .leading, spacing: 20) {
+                // Stats row
+                HStack(spacing: 12) {
+                    StatCard(
+                        title: "Words",
+                        value: formatNumber(appState.totalWordsTranscribed),
+                        icon: "character.cursor.ibeam",
+                        color: .blue
+                    )
+                    StatCard(
+                        title: "WPM",
+                        value: "\(appState.wordsPerMinute)",
+                        icon: "gauge.with.dots.needle.33percent",
+                        color: .green
+                    )
+                    StatCard(
+                        title: "Transcripts",
+                        value: "\(appState.database.transcripts.count)",
+                        icon: "doc.text",
+                        color: .purple
+                    )
+                    StatCard(
+                        title: "Time Saved",
+                        value: formatTimeSaved(appState.totalRecordingSeconds),
+                        icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                        color: .orange
+                    )
                 }
 
-                // Hero banner
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(.linearGradient(
-                            colors: [Color(nsColor: .controlAccentColor).opacity(0.8), .purple.opacity(0.6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(height: 140)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 4) {
-                            Text("Hold")
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                            Text("fn")
-                                .font(.system(size: 24, weight: .bold, design: .monospaced))
-                                .italic()
-                            Text("to dictate and let VoiceTranscriber format for you")
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                        }
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-
-                        Text("Press and hold \(appState.hotkeyDescription) to dictate in any app. Smart Formatting and context awareness handle the rest.")
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.85))
-                            .lineLimit(2)
-                    }
-                    .padding(24)
-                }
+                // Quick action banner
+                QuickActionBanner(appState: appState)
 
                 // Error banner
                 if let error = appState.lastError {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
+                            .font(.system(size: 12))
                         Text(error)
                             .font(.system(size: 12))
                             .foregroundColor(.orange)
                         Spacer()
                         Button(action: { appState.lastError = nil }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(12)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(Color.orange.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange.opacity(0.15), lineWidth: 0.5)
+                            )
                     )
                 }
 
-                // Today's transcripts header
-                HStack {
-                    Text(todayHeaderText)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
-                        .tracking(0.5)
-                    Spacer()
+                // Translation indicator
+                if appState.config.translationEnabled {
+                    HStack(spacing: 8) {
+                        Image(systemName: "globe")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 12))
+                        let langName = ConfigManager.supportedLanguages.first(where: { $0.code == appState.config.targetLanguage })?.name ?? appState.config.targetLanguage
+                        Text("Translation active — output in \(langName)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.blue)
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.06))
+                    )
                 }
 
-                // Transcript list
-                if appState.database.transcripts.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer().frame(height: 20)
-                        Image(systemName: "waveform.badge.plus")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.linearGradient(
-                                colors: [.blue.opacity(0.4), .purple.opacity(0.4)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                        Text("No transcripts yet")
-                            .font(.system(size: 14, weight: .medium))
+                // Transcript list section
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(sectionHeaderText)
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
-                        Text("Press your hotkey to start recording.\nTranscripts will appear here.")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-                            .multilineTextAlignment(.center)
+                            .tracking(0.5)
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    LazyVStack(spacing: 2) {
-                        ForEach(appState.database.transcripts.prefix(50)) { transcript in
-                            TranscriptRow(transcript: transcript)
+
+                    if appState.database.transcripts.isEmpty {
+                        EmptyTranscriptsView(hotkeyDescription: appState.hotkeyDescription)
+                    } else {
+                        LazyVStack(spacing: 1) {
+                            ForEach(appState.database.transcripts.prefix(50)) { transcript in
+                                TranscriptRow(transcript: transcript)
+                            }
                         }
                     }
                 }
             }
-            .padding(28)
+            .padding(24)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private var todayHeaderText: String {
+    private var sectionHeaderText: String {
         let today = appState.database.transcripts.filter {
             Calendar.current.isDateInToday($0.timestamp)
         }.count
@@ -124,38 +119,119 @@ struct HomeView: View {
         return "RECENT"
     }
 
-    private func formatWords(_ count: Int) -> String {
+    private func formatNumber(_ count: Int) -> String {
         if count >= 1000 {
             return String(format: "%.1fK", Double(count) / 1000.0)
         }
         return "\(count)"
     }
+
+    private func formatTimeSaved(_ seconds: Double) -> String {
+        // Estimate typing time saved: ~40 WPM typing vs speaking
+        let minutesSaved = seconds / 60.0 * 1.5 // rough multiplier
+        if minutesSaved < 1 { return "0m" }
+        if minutesSaved < 60 { return "\(Int(minutesSaved))m" }
+        return String(format: "%.1fh", minutesSaved / 60.0)
+    }
 }
 
-// MARK: - Stat Badge
+// MARK: - Stat Card
 
-private struct StatBadge: View {
-    let icon: String
+private struct StatCard: View {
+    let title: String
     let value: String
-    let label: String
+    let icon: String
+    let color: Color
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundColor(color.opacity(0.8))
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
+    }
+}
+
+// MARK: - Quick Action Banner
+
+private struct QuickActionBanner: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Hold \(appState.hotkeyDescription) to dictate")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundColor(.primary)
+
+                Text("Smart formatting and context awareness handle the rest.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            // Animated mic icon
+            ZStack {
+                Circle()
+                    .fill(appState.isRecording ?
+                          Color.red.opacity(0.15) :
+                          Color.accentColor.opacity(0.1))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: appState.isRecording ? "mic.fill" : "mic")
+                    .font(.system(size: 18))
+                    .foregroundColor(appState.isRecording ? .red : .accentColor)
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
+// MARK: - Empty State
+
+private struct EmptyTranscriptsView: View {
+    let hotkeyDescription: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Spacer().frame(height: 20)
+            Image(systemName: "waveform")
+                .font(.system(size: 32))
+                .foregroundColor(.secondary.opacity(0.4))
+            Text("No transcripts yet")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            Text("Hold \(hotkeyDescription) to start dictating.\nTranscripts will appear here.")
+                .font(.system(size: 12))
+                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -166,22 +242,32 @@ private struct TranscriptRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Timestamp
-            Text(timeString)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(.secondary)
-                .frame(width: 65, alignment: .trailing)
+        HStack(alignment: .top, spacing: 14) {
+            // Time column
+            VStack(spacing: 2) {
+                Text(timeString)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                Text(durationString)
+                    .font(.system(size: 9))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+            }
+            .frame(width: 60, alignment: .trailing)
+
+            // Divider dot
+            Circle()
+                .fill(Color.accentColor.opacity(0.3))
+                .frame(width: 5, height: 5)
+                .padding(.top, 5)
 
             // Content
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transcript.cleanedText)
-                    .font(.system(size: 13))
-                    .lineLimit(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(transcript.cleanedText)
+                .font(.system(size: 13))
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Copy button (visible on hover)
+            // Copy button
             if isHovered {
                 Button(action: {
                     NSPasteboard.general.clearContents()
@@ -197,8 +283,8 @@ private struct TranscriptRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovered ? Color(nsColor: .controlBackgroundColor) : Color.clear)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovered ? Color(nsColor: .controlBackgroundColor).opacity(0.6) : Color.clear)
         )
         .onHover { hovering in
             isHovered = hovering
@@ -209,5 +295,11 @@ private struct TranscriptRow: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: transcript.timestamp)
+    }
+
+    private var durationString: String {
+        let seconds = Int(transcript.durationSeconds)
+        if seconds < 60 { return "\(seconds)s" }
+        return "\(seconds / 60)m \(seconds % 60)s"
     }
 }

@@ -33,46 +33,37 @@ struct StyleView: View {
                     Spacer()
                 }
 
-                // Context banner
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(.linearGradient(
-                            colors: bannerColors(for: selectedContext),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
+                // Context info card
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Style for \(selectedContext.displayName.lowercased())")
+                            .font(.system(size: 15, weight: .semibold))
 
-                    HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("This style applies in \(selectedContext.displayName.lowercased())")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
+                        Text(selectedContext.description)
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
 
-                            Text(selectedContext.description)
-                                .font(.system(size: 12))
-                                .foregroundColor(.white.opacity(0.85))
+                    Spacer()
+
+                    HStack(spacing: 6) {
+                        ForEach(appIcons(for: selectedContext), id: \.self) { icon in
+                            Image(systemName: icon)
+                                .font(.system(size: 16))
+                                .foregroundColor(.secondary)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                )
                         }
-                        .padding(20)
-
-                        Spacer()
-
-                        // App icons placeholder
-                        HStack(spacing: -4) {
-                            ForEach(appIcons(for: selectedContext), id: \.self) { icon in
-                                Circle()
-                                    .fill(Color.white.opacity(0.2))
-                                    .frame(width: 36, height: 36)
-                                    .overlay(
-                                        Image(systemName: icon)
-                                            .font(.system(size: 16))
-                                            .foregroundColor(.white.opacity(0.7))
-                                    )
-                            }
-                        }
-                        .padding(.trailing, 20)
                     }
                 }
-                .frame(height: 100)
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
 
                 // Style cards
                 let currentTone = config.styleTone(for: selectedContext)
@@ -92,15 +83,6 @@ struct StyleView: View {
             .padding(28)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func bannerColors(for context: StyleContext) -> [Color] {
-        switch context {
-        case .personalMessages: return [.blue.opacity(0.7), .cyan.opacity(0.5)]
-        case .workMessages: return [.purple.opacity(0.7), .indigo.opacity(0.5)]
-        case .email: return [.orange.opacity(0.7), .red.opacity(0.5)]
-        case .other: return [.gray.opacity(0.5), .brown.opacity(0.4)]
-        }
     }
 
     private func appIcons(for context: StyleContext) -> [String] {

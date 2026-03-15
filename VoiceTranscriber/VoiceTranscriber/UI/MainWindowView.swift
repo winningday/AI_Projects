@@ -9,22 +9,25 @@ struct MainWindowView: View {
             // Sidebar
             VStack(spacing: 0) {
                 // App logo/title
-                HStack(spacing: 8) {
-                    Image(systemName: "waveform.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.linearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.linearGradient(
+                                colors: [.accentColor.opacity(0.8), .accentColor.opacity(0.4)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(width: 30, height: 30)
+                        Image(systemName: "waveform")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
                     Text("VoiceTranscriber")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .semibold))
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                Divider()
 
                 // Navigation items
                 List(AppTab.allCases, selection: $appState.selectedTab) { tab in
@@ -35,31 +38,22 @@ struct MainWindowView: View {
 
                 Divider()
 
-                // Recording status footer
-                VStack(spacing: 8) {
+                // Status footer
+                VStack(spacing: 6) {
                     HStack(spacing: 6) {
                         Circle()
                             .fill(statusColor)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 6, height: 6)
                         Text(appState.statusMessage)
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
                         Spacer()
                     }
 
                     HStack(spacing: 4) {
-                        Image(systemName: "keyboard")
-                            .font(.system(size: 10))
                         Text("Hold")
                             .font(.system(size: 10))
-                        Text(appState.hotkeyDescription)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                            )
+                        KeyBadge(text: appState.hotkeyDescription)
                         Text("to record")
                             .font(.system(size: 10))
                         Spacer()
@@ -71,7 +65,6 @@ struct MainWindowView: View {
             }
             .frame(minWidth: 180, maxWidth: 220)
         } detail: {
-            // Content area
             switch appState.selectedTab {
             case .home:
                 HomeView(appState: appState)
@@ -81,6 +74,7 @@ struct MainWindowView: View {
                 StyleView(config: appState.config)
             case .settings:
                 AppSettingsView(
+                    appState: appState,
                     config: appState.config,
                     hotkeyManager: appState.hotkeyManager,
                     database: appState.database
@@ -93,5 +87,26 @@ struct MainWindowView: View {
         if appState.isRecording { return .red }
         if appState.isProcessing { return .orange }
         return .green
+    }
+}
+
+// MARK: - Key Badge (reusable hotkey display)
+
+struct KeyBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
+                    )
+            )
     }
 }

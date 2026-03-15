@@ -33,6 +33,7 @@ final class AppState: ObservableObject {
     @Published var statusMessage: String = "Ready"
     @Published var selectedTab: AppTab = .home
     @Published var totalWordsTranscribed: Int = 0
+    @Published var totalRecordingSeconds: Double = 0
 
     let audioRecorder = AudioRecorder()
     let levelMonitor: AudioLevelMonitor
@@ -52,12 +53,25 @@ final class AppState: ObservableObject {
         self.levelMonitor = AudioLevelMonitor(recorder: audioRecorder)
         setupHotkeyCallbacks()
         computeTotalWords()
+        computeTotalRecordingTime()
     }
 
     private func computeTotalWords() {
         totalWordsTranscribed = database.transcripts.reduce(0) {
             $0 + $1.cleanedText.split(separator: " ").count
         }
+    }
+
+    private func computeTotalRecordingTime() {
+        totalRecordingSeconds = database.transcripts.reduce(0.0) {
+            $0 + $1.durationSeconds
+        }
+    }
+
+    /// Words per minute across all transcripts
+    var wordsPerMinute: Int {
+        guard totalRecordingSeconds > 30 else { return 0 }
+        return Int(Double(totalWordsTranscribed) / (totalRecordingSeconds / 60.0))
     }
 
     // MARK: - Hotkey Callbacks
@@ -183,7 +197,7 @@ final class AppState: ObservableObject {
             // Step 2: Determine style based on active app
             let styleTone = detectStyleTone(appName: activeApp)
 
-            // Step 3: Clean with Claude (dictionary, style, context, smart formatting)
+            // Step 3: Clean with Claude (dictionary, style, context, smart formatting, translation)
             statusMessage = "Cleaning up..."
             let cleanedText = try await claudeClient.cleanTranscription(
                 rawText,
@@ -191,7 +205,9 @@ final class AppState: ObservableObject {
                 styleTone: styleTone,
                 activeApp: activeApp,
                 contextText: config.contextAwareness ? contextText : nil,
-                smartFormatting: config.smartFormatting
+                smartFormatting: config.smartFormatting,
+                translationEnabled: config.translationEnabled,
+                targetLanguage: config.targetLanguage
             )
 
             // Step 4: Save
@@ -212,6 +228,7 @@ final class AppState: ObservableObject {
             statusMessage = "Ready"
             lastError = nil
             computeTotalWords()
+            computeTotalRecordingTime()
 
             if config.useHapticFeedback {
                 NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
@@ -256,17 +273,7 @@ final class AppState: ObservableObject {
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
             window.makeKeyAndOrderFront(nil)
         } else {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
-                styleMask: [.titled, .closable, .resizable, .miniaturizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.identifier = NSUserInterfaceItemIdentifier("main")
-            window.title = "VoiceTranscriber"
-            window.center()
-            window.minSize = NSSize(width: 700, height: 450)
-            window.contentView = NSHostingView(rootView: MainWindowView(appState: self))
+            let window = MainAppWindow(appState: self)
             window.makeKeyAndOrderFront(nil)
         }
     }
@@ -318,6 +325,51 @@ final class AppState: ObservableObject {
     }
 }
 
+// MARK: - Main App Window (prevents crash on close)
+
+/// Custom NSWindow subclass that hides instead of closing to prevent
+/// the SIGSEGV crash in _NSWindowTransformAnimation dealloc.
+final class MainAppWindow: NSWindow {
+    init(appState: AppState) {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        self.identifier = NSUserInterfaceItemIdentifier("main")
+        self.title = "VoiceTranscriber"
+        self.center()
+        self.minSize = NSSize(width: 700, height: 450)
+        self.contentView = NSHostingView(rootView: MainWindowView(appState: appState))
+        self.isReleasedWhenClosed = false
+        self.delegate = WindowDelegate.shared
+    }
+}
+
+/// Window delegate that hides the main window instead of closing it,
+/// preventing the animation dealloc crash.
+final class WindowDelegate: NSObject, NSWindowDelegate {
+    static let shared = WindowDelegate()
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if sender.identifier?.rawValue == "main" {
+            sender.orderOut(nil)
+            // Revert to accessory if no visible windows
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                let hasVisibleWindows = NSApp.windows.contains {
+                    $0.isVisible && $0.identifier?.rawValue != "com.apple.menuExtra" && !($0 is NSPanel)
+                }
+                if !hasVisibleWindows {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            return false
+        }
+        return true
+    }
+}
+
 // MARK: - App Entry Point
 
 @main
@@ -337,16 +389,6 @@ struct VoiceTranscriberApp: App {
             }
         }
         .menuBarExtraStyle(.window)
-
-        // Main app window
-        WindowGroup("VoiceTranscriber") {
-            MainWindowView(appState: appState)
-                .frame(minWidth: 700, minHeight: 450)
-                .onAppear {
-                    appState.appDidFinishLaunching()
-                }
-        }
-        .defaultSize(width: 900, height: 600)
     }
 
     private var menuBarIcon: String {
@@ -360,8 +402,8 @@ struct VoiceTranscriberApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Show in dock so users can Cmd+Tab
-        NSApp.setActivationPolicy(.regular)
+        // Start as accessory (menu bar only) — window opens from menu bar
+        NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -370,6 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for window in NSApp.windows {
                 if window.identifier?.rawValue == "main" {
                     window.makeKeyAndOrderFront(nil)
+                    NSApp.setActivationPolicy(.regular)
                     return true
                 }
             }

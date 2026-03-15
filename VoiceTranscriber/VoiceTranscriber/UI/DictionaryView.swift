@@ -73,36 +73,37 @@ struct DictionaryView: View {
             .padding(.bottom, 0)
 
             // Info banner
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.linearGradient(
-                        colors: [Color(nsColor: .controlAccentColor).opacity(0.7), .purple.opacity(0.5)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Your personal vocabulary")
+                    .font(.system(size: 15, weight: .semibold))
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("VoiceTranscriber speaks the way you speak.")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                Text("Add names, jargon, and terms to improve transcription accuracy. These are sent to the speech engine as spelling hints.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
 
-                    Text("Add personal terms, company jargon, client names, or industry-specific lingo. These words are sent to the transcription engine to improve accuracy.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(3)
-
-                    // Sample chips
+                if !config.dictionaryEntries.isEmpty {
                     HStack(spacing: 6) {
-                        AddWordChip(label: "Add new word", action: { /* focus field */ })
-                        ForEach(config.dictionaryEntries.prefix(4)) { entry in
-                            WordChip(label: entry.word)
+                        ForEach(config.dictionaryEntries.prefix(5)) { entry in
+                            Text(entry.word)
+                                .font(.system(size: 11, weight: .medium))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.accentColor.opacity(0.1))
+                                )
                         }
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 2)
                 }
-                .padding(20)
             }
-            .frame(height: 130)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
             .padding(.horizontal, 28)
 
             // Add word field
@@ -193,46 +194,3 @@ struct DictionaryView: View {
     }
 }
 
-// MARK: - Chips
-
-private struct WordChip: View {
-    let label: String
-
-    var body: some View {
-        Text(label)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.2))
-                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
-            )
-    }
-}
-
-private struct AddWordChip: View {
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 3) {
-                Image(systemName: "plus")
-                    .font(.system(size: 9, weight: .bold))
-                Text(label)
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.15))
-                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}

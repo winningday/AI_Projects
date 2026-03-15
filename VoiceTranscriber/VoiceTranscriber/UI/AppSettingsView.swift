@@ -3,6 +3,7 @@ import AVFoundation
 
 /// In-app settings view (shown in the main window sidebar).
 struct AppSettingsView: View {
+    @ObservedObject var appState: AppState
     @ObservedObject var config: ConfigManager
     @ObservedObject var hotkeyManager: HotKeyManager
     @ObservedObject var database: TranscriptDatabase
@@ -16,6 +17,7 @@ struct AppSettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var micGranted = false
     @State private var axGranted = false
+    @State private var permissionTimer: Timer?
 
     var body: some View {
         ScrollView {
@@ -35,25 +37,16 @@ struct AppSettingsView: View {
                 SettingsSection(title: "Hotkey", icon: "keyboard") {
                     HStack {
                         Text("Current hotkey:")
-                        Text(HotKeyManager.keyName(for: config.hotkeyKeyCode, modifiers: config.hotkeyModifiers))
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(Color(nsColor: .separatorColor))
-                                    )
-                            )
+                            .font(.system(size: 13))
+                        KeyBadge(text: HotKeyManager.keyName(for: config.hotkeyKeyCode, modifiers: config.hotkeyModifiers))
                         Spacer()
                     }
 
                     if isCapturingHotkey {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Press any key combination...")
+                            Text("Press any key or key combination...")
+                                .font(.system(size: 12))
                                 .foregroundColor(.orange)
                         }
                         Button("Cancel") {
@@ -68,13 +61,49 @@ struct AppSettingsView: View {
                             hotkeyManager.onHotkeyCaptured = { keyCode, modifiers in
                                 hotkeyManager.updateHotkey(keyCode: keyCode, modifiers: modifiers)
                                 isCapturingHotkey = false
+                                // Restart listening with new hotkey
+                                hotkeyManager.stopListening()
+                                hotkeyManager.startListening()
                             }
                         }
+                    }
+
+                    Text("The hotkey display throughout the app updates automatically when changed.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+
+                // Translation section
+                SettingsSection(title: "Translation", icon: "globe") {
+                    Toggle(isOn: $config.translationEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Translation mode")
+                            Text("Automatically translate transcribed speech to your target language")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if config.translationEnabled {
+                        HStack {
+                            Text("Output language:")
+                                .font(.system(size: 13))
+                            Picker("", selection: $config.targetLanguage) {
+                                ForEach(ConfigManager.supportedLanguages, id: \.code) { lang in
+                                    Text(lang.name).tag(lang.code)
+                                }
+                            }
+                            .frame(width: 180)
+                        }
+
+                        Text("Speak in any language — the output will always be in \(ConfigManager.supportedLanguages.first(where: { $0.code == config.targetLanguage })?.name ?? config.targetLanguage). Works with Chinese, Spanish, French, Arabic, and more.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     }
                 }
 
                 // Extras section
-                SettingsSection(title: "Extras", icon: "sparkles") {
+                SettingsSection(title: "Intelligence", icon: "sparkles") {
                     Toggle("Smart formatting (code, technical terms)", isOn: $config.smartFormatting)
                     Toggle("Auto-add corrected words to dictionary", isOn: $config.autoAddToDictionary)
                     Toggle("Context awareness (read surrounding text for accuracy)", isOn: $config.contextAwareness)
@@ -102,15 +131,33 @@ struct AppSettingsView: View {
                         title: "Accessibility", description: "Global hotkey & text injection",
                         isGranted: axGranted,
                         action: {
-                            let _ = hotkeyManager.checkAccessibilityPermission()
+                            // Open directly to the Accessibility pane
                             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                                 NSWorkspace.shared.open(url)
                             }
                         }
                     )
 
-                    Button("Refresh Permissions") { refreshPermissions() }
-                        .controlSize(.small)
+                    if !axGranted {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("After enabling in System Settings, click Refresh below.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                            Text("Note: You may need to remove and re-add VoiceTranscriber if you rebuilt the app.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.orange)
+                        }
+                    }
+
+                    Button("Refresh Permissions") {
+                        refreshPermissions()
+                        // Also restart hotkey listening if accessibility was just granted
+                        if axGranted {
+                            hotkeyManager.stopListening()
+                            hotkeyManager.startListening()
+                        }
+                    }
+                    .controlSize(.small)
                 }
 
                 // API Keys section
@@ -202,6 +249,14 @@ struct AppSettingsView: View {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
             refreshPermissions()
+            // Poll permissions every 2s to detect changes made in System Settings
+            permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                DispatchQueue.main.async { refreshPermissions() }
+            }
+        }
+        .onDisappear {
+            permissionTimer?.invalidate()
+            permissionTimer = nil
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {
             Button("OK") {}

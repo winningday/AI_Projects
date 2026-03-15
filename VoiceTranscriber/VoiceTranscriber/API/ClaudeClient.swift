@@ -1,7 +1,7 @@
 import Foundation
 
 /// Client for the Anthropic Claude API, used for cleaning up raw transcriptions.
-/// Supports dictionary words, style profiles, context awareness, and smart formatting.
+/// Supports dictionary words, style profiles, context awareness, smart formatting, and translation.
 final class ClaudeClient {
     private let baseURL = "https://api.anthropic.com/v1/messages"
     private let session: URLSession
@@ -12,21 +12,15 @@ final class ClaudeClient {
     }
 
     /// Cleans up a raw voice transcription using Claude Haiku.
-    /// - Parameters:
-    ///   - rawText: The raw transcription from Whisper
-    ///   - dictionaryWords: Custom words/names the user has added
-    ///   - styleTone: The style tone to apply based on the active app context
-    ///   - activeApp: Name of the currently focused application
-    ///   - contextText: Surrounding text from the active text field
-    ///   - smartFormatting: Whether to apply smart code/technical formatting
-    /// - Returns: Cleaned text with corrections, style, and formatting applied
     func cleanTranscription(
         _ rawText: String,
         dictionaryWords: [String] = [],
         styleTone: StyleTone = .formal,
         activeApp: String? = nil,
         contextText: String? = nil,
-        smartFormatting: Bool = true
+        smartFormatting: Bool = true,
+        translationEnabled: Bool = false,
+        targetLanguage: String = "en"
     ) async throws -> String {
         guard let apiKey = ConfigManager.shared.claudeAPIKey, !apiKey.isEmpty else {
             throw ClaudeError.missingAPIKey
@@ -36,8 +30,9 @@ final class ClaudeClient {
         guard !trimmed.isEmpty else { return trimmed }
 
         // For very short text (< 5 words), skip Claude and return as-is with basic cleanup
+        // (unless translation is enabled, then always process)
         let wordCount = trimmed.split(separator: " ").count
-        if wordCount <= 3 {
+        if wordCount <= 3 && !translationEnabled {
             return trimmed
         }
 
@@ -46,7 +41,9 @@ final class ClaudeClient {
             styleTone: styleTone,
             activeApp: activeApp,
             contextText: contextText,
-            smartFormatting: smartFormatting
+            smartFormatting: smartFormatting,
+            translationEnabled: translationEnabled,
+            targetLanguage: targetLanguage
         )
 
         let requestBody = ClaudeRequestWithSystem(
@@ -94,7 +91,9 @@ final class ClaudeClient {
         styleTone: StyleTone,
         activeApp: String?,
         contextText: String?,
-        smartFormatting: Bool
+        smartFormatting: Bool,
+        translationEnabled: Bool,
+        targetLanguage: String
     ) -> String {
         var prompt = """
         You are a real-time voice transcription processor. You receive raw speech-to-text output and return clean, polished text ready to be inserted into a document or message field.
@@ -109,6 +108,21 @@ final class ClaudeClient {
         - If the text is very short or a single word/phrase, return it with minimal changes
         - Output ONLY the cleaned text. No explanations, no markers, no quotes.
         """
+
+        // Translation
+        if translationEnabled {
+            let langName = ConfigManager.supportedLanguages.first(where: { $0.code == targetLanguage })?.name ?? targetLanguage
+            prompt += """
+
+            TRANSLATION MODE (ENABLED):
+            - Auto-detect the language of the input speech.
+            - Translate the final cleaned output into \(langName) (\(targetLanguage)).
+            - The input may be in ANY language — Chinese, Spanish, French, Arabic, etc.
+            - Produce natural, fluent \(langName) output — not a word-for-word literal translation.
+            - Apply all cleaning rules FIRST, then translate.
+            - If the input is already in \(langName), just clean it without translation.
+            """
+        }
 
         // Style instructions
         prompt += "\n\nSTYLE: \(styleTone.promptInstructions)"
@@ -138,7 +152,6 @@ final class ClaudeClient {
         if let app = activeApp {
             prompt += "\n\nACTIVE APP: The user is typing in \"\(app)\". Adjust tone appropriately."
 
-            // App-specific hints
             let appLower = app.lowercased()
             if appLower.contains("slack") || appLower.contains("teams") || appLower.contains("discord") {
                 prompt += " This is a work messenger — keep it professional but concise."

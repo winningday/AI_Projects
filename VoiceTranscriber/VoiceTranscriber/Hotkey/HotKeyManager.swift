@@ -153,10 +153,54 @@ final class HotKeyManager: ObservableObject {
 
     func startCapturingHotkey() {
         isCapturingNewHotkey = true
+
+        // If event tap isn't running, use NSEvent monitors for capture
+        if eventTap == nil {
+            stopNSEventMonitors()
+
+            // Monitor for key presses
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+                guard let self = self, self.isCapturingNewHotkey else { return event }
+
+                if event.type == .keyDown {
+                    let keyCode = event.keyCode
+                    let modifiers = event.modifierFlags.rawValue & (
+                        NSEvent.ModifierFlags.shift.rawValue |
+                        NSEvent.ModifierFlags.control.rawValue |
+                        NSEvent.ModifierFlags.option.rawValue |
+                        NSEvent.ModifierFlags.command.rawValue
+                    )
+
+                    DispatchQueue.main.async {
+                        self.isCapturingNewHotkey = false
+                        self.onHotkeyCaptured?(keyCode, UInt(modifiers))
+                        // Restart normal monitors
+                        self.startNSEventMonitors()
+                    }
+                    return nil // Consume event
+                }
+
+                // Fn key capture via flagsChanged
+                if event.keyCode == 63 {
+                    DispatchQueue.main.async {
+                        self.isCapturingNewHotkey = false
+                        self.onHotkeyCaptured?(63, 0)
+                        self.startNSEventMonitors()
+                    }
+                    return nil
+                }
+
+                return event
+            }
+        }
     }
 
     func stopCapturingHotkey() {
         isCapturingNewHotkey = false
+        // Restart normal monitors if no event tap
+        if eventTap == nil {
+            startNSEventMonitors()
+        }
     }
 
     // MARK: - Event Tap Handler

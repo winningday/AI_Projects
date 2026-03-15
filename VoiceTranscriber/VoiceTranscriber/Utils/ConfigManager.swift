@@ -118,6 +118,8 @@ final class ConfigManager: ObservableObject {
         static let autoAddToDictionary = "autoAddToDictionary"
         static let dictionaryEntries = "dictionaryEntries"
         static let styleProfiles = "styleProfiles"
+        static let translationEnabled = "translationEnabled"
+        static let targetLanguage = "targetLanguage"
     }
 
     // MARK: - Keychain Service
@@ -173,6 +175,37 @@ final class ConfigManager: ObservableObject {
         didSet { defaults.set(autoAddToDictionary, forKey: Keys.autoAddToDictionary) }
     }
 
+    @Published var translationEnabled: Bool {
+        didSet { defaults.set(translationEnabled, forKey: Keys.translationEnabled) }
+    }
+
+    @Published var targetLanguage: String {
+        didSet { defaults.set(targetLanguage, forKey: Keys.targetLanguage) }
+    }
+
+    static let supportedLanguages: [(code: String, name: String)] = [
+        ("en", "English"),
+        ("es", "Spanish"),
+        ("fr", "French"),
+        ("de", "German"),
+        ("it", "Italian"),
+        ("pt", "Portuguese"),
+        ("zh", "Chinese (Simplified)"),
+        ("ja", "Japanese"),
+        ("ko", "Korean"),
+        ("ar", "Arabic"),
+        ("ru", "Russian"),
+        ("hi", "Hindi"),
+        ("nl", "Dutch"),
+        ("sv", "Swedish"),
+        ("pl", "Polish"),
+        ("tr", "Turkish"),
+        ("vi", "Vietnamese"),
+        ("th", "Thai"),
+        ("he", "Hebrew"),
+        ("uk", "Ukrainian"),
+    ]
+
     // MARK: - Dictionary
 
     @Published var dictionaryEntries: [DictionaryEntry] = [] {
@@ -223,6 +256,8 @@ final class ConfigManager: ObservableObject {
         self.contextAwareness = defaults.object(forKey: Keys.contextAwareness) as? Bool ?? true
         self.smartFormatting = defaults.object(forKey: Keys.smartFormatting) as? Bool ?? true
         self.autoAddToDictionary = defaults.object(forKey: Keys.autoAddToDictionary) as? Bool ?? true
+        self.translationEnabled = defaults.bool(forKey: Keys.translationEnabled)
+        self.targetLanguage = defaults.string(forKey: Keys.targetLanguage) ?? "en"
 
         // Load dictionary
         if let data = defaults.data(forKey: Keys.dictionaryEntries),
