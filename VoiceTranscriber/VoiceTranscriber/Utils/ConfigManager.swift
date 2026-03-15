@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import ServiceManagement
 
 /// Style profile for different message contexts.
@@ -280,6 +281,61 @@ final class ConfigManager: ObservableObject {
            let profiles = try? JSONDecoder().decode([String: String].self, from: data) {
             self.styleProfiles = profiles
         }
+
+        // Migrate API keys from Keychain → UserDefaults (v1.1 → v1.2 upgrade)
+        migrateKeychainKeysIfNeeded()
+    }
+
+    // MARK: - Keychain Migration (one-time, v1.1 → v1.2)
+
+    private static let keychainMigrationKey = "keychainMigrationDone_v1_2"
+
+    private func migrateKeychainKeysIfNeeded() {
+        guard !defaults.bool(forKey: Self.keychainMigrationKey) else { return }
+
+        let keychainService = "com.verbalize.apikeys"
+
+        // Try to read old Keychain values
+        if let oldOpenAI = readLegacyKeychain(service: keychainService, account: "openai_api_key"),
+           !oldOpenAI.isEmpty,
+           defaults.string(forKey: APIKeys.openAI) == nil {
+            defaults.set(obfuscate(oldOpenAI), forKey: APIKeys.openAI)
+        }
+
+        if let oldClaude = readLegacyKeychain(service: keychainService, account: "claude_api_key"),
+           !oldClaude.isEmpty,
+           defaults.string(forKey: APIKeys.claude) == nil {
+            defaults.set(obfuscate(oldClaude), forKey: APIKeys.claude)
+        }
+
+        // Clean up old Keychain entries so the password prompt never appears again
+        deleteLegacyKeychain(service: keychainService, account: "openai_api_key")
+        deleteLegacyKeychain(service: keychainService, account: "claude_api_key")
+
+        defaults.set(true, forKey: Self.keychainMigrationKey)
+    }
+
+    private func readLegacyKeychain(service: String, account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func deleteLegacyKeychain(service: String, account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     // MARK: - Dictionary Persistence
