@@ -20,6 +20,10 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
             path: "VoiceTranscriber",
+            exclude: [
+                "Info.plist",
+                "VoiceTranscriber.entitlements"
+            ],
             resources: [
                 .process("Resources")
             ]

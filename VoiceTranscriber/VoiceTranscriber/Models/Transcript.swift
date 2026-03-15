@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a single voice transcription entry with original and cleaned text.
-struct Transcript: Identifiable, Codable {
+struct Transcript: Identifiable, Codable, Hashable {
     let id: UUID
     let timestamp: Date
     let originalText: String
