@@ -62,6 +62,8 @@ struct MainWindowView: View {
             switch appState.selectedTab {
             case .home:
                 HomeView(appState: appState)
+            case .history:
+                TranscriptHistoryView(database: appState.database)
             case .stats:
                 StatsView(appState: appState)
             case .dictionary:

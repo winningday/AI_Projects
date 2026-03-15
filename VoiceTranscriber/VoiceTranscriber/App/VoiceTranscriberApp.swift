@@ -6,6 +6,7 @@ import Combine
 
 enum AppTab: String, CaseIterable, Identifiable {
     case home = "Home"
+    case history = "History"
     case stats = "Stats"
     case dictionary = "Dictionary"
     case style = "Style"
@@ -16,6 +17,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .home: return "house"
+        case .history: return "clock.arrow.circlepath"
         case .stats: return "chart.bar"
         case .dictionary: return "character.book.closed"
         case .style: return "textformat"
@@ -246,6 +248,7 @@ final class AppState: ObservableObject {
             statusMessage = "Transcribing..."
             let rawText = try await whisperClient.transcribe(
                 fileURL: url,
+                language: config.translationEnabled ? nil : "en",
                 dictionaryWords: config.dictionaryWords,
                 contextHint: contextText
             )
@@ -325,7 +328,7 @@ final class AppState: ObservableObject {
     }
 
     func showTranscriptHistory() {
-        selectedTab = .home
+        selectedTab = .history
         showMainWindow()
     }
 
