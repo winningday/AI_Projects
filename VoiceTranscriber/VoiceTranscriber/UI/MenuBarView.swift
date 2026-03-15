@@ -173,7 +173,10 @@ struct MenuBarView: View {
                             .foregroundColor(.secondary)
                             .padding(.leading, 34)
 
-                        Picker("", selection: $appState.config.targetLanguage) {
+                        Picker("", selection: Binding(
+                            get: { appState.config.targetLanguage },
+                            set: { appState.config.targetLanguage = $0 }
+                        )) {
                             ForEach(ConfigManager.supportedLanguages, id: \.code) { lang in
                                 Text(lang.name).tag(lang.code)
                             }

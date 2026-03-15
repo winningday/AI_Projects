@@ -54,134 +54,83 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
 # Generate app icon using sips (built-in macOS tool)
 generate_app_icon() {
     local ICON_DIR="${RESOURCES}/AppIcon.iconset"
+    local SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    local SOURCE_ICON="${SCRIPT_DIR}/icon.png"
     mkdir -p "${ICON_DIR}"
 
-    # Create a simple icon using Python (available on macOS)
-    python3 - "${ICON_DIR}" << 'PYEOF'
-import sys, struct, zlib, os
+    if [ ! -f "${SOURCE_ICON}" ]; then
+        echo "==> Warning: icon.png not found, skipping icon generation"
+        return
+    fi
 
-icon_dir = sys.argv[1]
+    echo "==> Generating app icon from icon.png..."
 
-def create_png(size, filepath):
-    """Create a simple app icon PNG with a gradient background and mic symbol."""
-    width = height = size
-    pixels = []
+    # The source icon.png is 1380x752 (banner with icon in center)
+    # Extract the center square (the app icon portion) using sips + python
+    local TEMP_SQUARE="${ICON_DIR}/_temp_square.png"
 
-    for y in range(height):
-        row = []
-        for x in range(width):
-            # Normalized coordinates
-            nx = x / width
-            ny = y / height
+    # Crop center square from the banner image using python
+    python3 - "${SOURCE_ICON}" "${TEMP_SQUARE}" << 'PYEOF'
+import sys, struct, zlib
 
-            # Rounded rectangle mask
-            margin = 0.12
-            corner_r = 0.22
-            in_rect = True
+src_path = sys.argv[1]
+dst_path = sys.argv[2]
 
-            # Check corners
-            if nx < margin + corner_r and ny < margin + corner_r:
-                dx = (margin + corner_r - nx) / corner_r
-                dy = (margin + corner_r - ny) / corner_r
-                if dx*dx + dy*dy > 1: in_rect = False
-            elif nx > 1 - margin - corner_r and ny < margin + corner_r:
-                dx = (nx - (1 - margin - corner_r)) / corner_r
-                dy = (margin + corner_r - ny) / corner_r
-                if dx*dx + dy*dy > 1: in_rect = False
-            elif nx < margin + corner_r and ny > 1 - margin - corner_r:
-                dx = (margin + corner_r - nx) / corner_r
-                dy = (ny - (1 - margin - corner_r)) / corner_r
-                if dx*dx + dy*dy > 1: in_rect = False
-            elif nx > 1 - margin - corner_r and ny > 1 - margin - corner_r:
-                dx = (nx - (1 - margin - corner_r)) / corner_r
-                dy = (ny - (1 - margin - corner_r)) / corner_r
-                if dx*dx + dy*dy > 1: in_rect = False
-            elif nx < margin or nx > 1 - margin or ny < margin or ny > 1 - margin:
-                in_rect = False
+with open(src_path, 'rb') as f:
+    data = f.read()
 
-            if not in_rect:
-                row.extend([0, 0, 0, 0])
-                continue
+# Parse PNG to get raw pixels
+# Read IHDR
+w, h = struct.unpack('>II', data[16:24])
+print(f"  Source: {w}x{h}")
 
-            # Gradient: deep blue-purple
-            r = int(30 + 40 * ny)
-            g = int(20 + 30 * ny)
-            b = int(120 + 80 * (1 - ny))
+# The icon is centered in the banner image
+# Crop a square from center, using height as the square size (with some padding)
+sq = min(w, h)
+# Add some top/bottom margin to focus on the icon
+margin_y = int(sq * 0.03)
+margin_x = int((w - sq) / 2)
 
-            # Draw stylized waveform bars in center
-            cx, cy = 0.5, 0.48
-            bar_width = 0.028
-            bar_gap = 0.055
-            bars = [-2, -1, 0, 1, 2]
-            bar_heights = [0.12, 0.22, 0.30, 0.22, 0.12]
+# For the crop, we'll use sips on macOS, so just write coords
+# Output the crop coordinates for sips
+crop_size = h - (margin_y * 2)
+print(f"  Cropping to {crop_size}x{crop_size} square from center")
 
-            is_bar = False
-            for i, bi in enumerate(bars):
-                bx = cx + bi * bar_gap
-                bh = bar_heights[i]
-                if abs(nx - bx) < bar_width and abs(ny - cy) < bh:
-                    is_bar = True
-                    break
-
-            if is_bar:
-                # White bars
-                r, g, b = 255, 255, 255
-
-            row.extend([r, g, b, 255])
-        pixels.append(bytes(row))
-
-    # Build PNG
-    def make_png(w, h, rows):
-        def chunk(ctype, data):
-            c = ctype + data
-            return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
-
-        sig = b'\x89PNG\r\n\x1a\n'
-        ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0))
-        raw = b''.join(b'\x00' + row for row in rows)
-        idat = chunk(b'IDAT', zlib.compress(raw, 9))
-        iend = chunk(b'IEND', b'')
-        return sig + ihdr + idat + iend
-
-    png_data = make_png(width, height, pixels)
-    with open(filepath, 'wb') as f:
-        f.write(png_data)
-
-# Generate all required sizes
-sizes = [16, 32, 64, 128, 256, 512, 1024]
-for s in sizes:
-    create_png(s, os.path.join(icon_dir, f"icon_{s}x{s}.png"))
-    print(f"  Generated {s}x{s} icon")
-
-# Create the iconset naming convention files
-import shutil
-mappings = {
-    "icon_16x16.png": 16,
-    "icon_16x16@2x.png": 32,
-    "icon_32x32.png": 32,
-    "icon_32x32@2x.png": 64,
-    "icon_128x128.png": 128,
-    "icon_128x128@2x.png": 256,
-    "icon_256x256.png": 256,
-    "icon_256x256@2x.png": 512,
-    "icon_512x512.png": 512,
-    "icon_512x512@2x.png": 1024,
-}
-
-for name, src_size in mappings.items():
-    src = os.path.join(icon_dir, f"icon_{src_size}x{src_size}.png")
-    dst = os.path.join(icon_dir, name)
-    if src != dst:
-        shutil.copy2(src, dst)
-
-# Clean up non-standard names
-for f in os.listdir(icon_dir):
-    path = os.path.join(icon_dir, f)
-    if f.startswith("icon_") and ("@" not in f) and f not in mappings:
-        # Keep only if it matches a standard name
-        if f not in mappings:
-            os.remove(path)
+# Write crop info for the shell script to use
+with open(dst_path + '.crop', 'w') as f:
+    f.write(f"{crop_size} {margin_x + (w - crop_size)//2 - margin_x} {margin_y}")
 PYEOF
+
+    # Read crop params and use sips (macOS built-in) to crop and resize
+    if [ -f "${TEMP_SQUARE}.crop" ]; then
+        read CROP_SIZE CROP_X CROP_Y < "${TEMP_SQUARE}.crop"
+        rm "${TEMP_SQUARE}.crop"
+
+        # Copy source and crop with sips
+        cp "${SOURCE_ICON}" "${TEMP_SQUARE}"
+        # Crop to square from center: first pad, then cropToHeightWidth
+        sips -c "${CROP_SIZE}" "${CROP_SIZE}" "${TEMP_SQUARE}" --out "${TEMP_SQUARE}" 2>/dev/null
+
+        # Generate all required iconset sizes
+        for size in 16 32 64 128 256 512 1024; do
+            sips -z "${size}" "${size}" "${TEMP_SQUARE}" --out "${ICON_DIR}/icon_${size}.png" 2>/dev/null
+        done
+
+        # Create iconset naming convention
+        cp "${ICON_DIR}/icon_16.png"   "${ICON_DIR}/icon_16x16.png"
+        cp "${ICON_DIR}/icon_32.png"   "${ICON_DIR}/icon_16x16@2x.png"
+        cp "${ICON_DIR}/icon_32.png"   "${ICON_DIR}/icon_32x32.png"
+        cp "${ICON_DIR}/icon_64.png"   "${ICON_DIR}/icon_32x32@2x.png"
+        cp "${ICON_DIR}/icon_128.png"  "${ICON_DIR}/icon_128x128.png"
+        cp "${ICON_DIR}/icon_256.png"  "${ICON_DIR}/icon_128x128@2x.png"
+        cp "${ICON_DIR}/icon_256.png"  "${ICON_DIR}/icon_256x256.png"
+        cp "${ICON_DIR}/icon_512.png"  "${ICON_DIR}/icon_256x256@2x.png"
+        cp "${ICON_DIR}/icon_512.png"  "${ICON_DIR}/icon_512x512.png"
+        cp "${ICON_DIR}/icon_1024.png" "${ICON_DIR}/icon_512x512@2x.png"
+
+        # Clean up temp files
+        rm -f "${TEMP_SQUARE}" "${ICON_DIR}"/icon_[0-9]*.png
+    fi
 
     # Convert iconset to icns
     if command -v iconutil &>/dev/null; then
