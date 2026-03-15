@@ -244,6 +244,11 @@ final class AppState: ObservableObject {
         HotKeyManager.keyName(for: config.hotkeyKeyCode, modifiers: config.hotkeyModifiers)
     }
 
+    func showTranscriptHistory() {
+        selectedTab = .home
+        showMainWindow()
+    }
+
     func showMainWindow() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)

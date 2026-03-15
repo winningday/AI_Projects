@@ -51,12 +51,7 @@ final class AudioRecorder: ObservableObject {
         let engine = AVAudioEngine()
 
         // Accessing inputNode can crash if no audio input device is available
-        let inputNode: AVAudioInputNode
-        do {
-            inputNode = engine.inputNode
-        } catch {
-            throw RecordingError.engineStartFailed
-        }
+        let inputNode = engine.inputNode
 
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
