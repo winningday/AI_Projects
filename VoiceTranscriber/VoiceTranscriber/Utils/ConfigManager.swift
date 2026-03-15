@@ -124,7 +124,7 @@ final class ConfigManager: ObservableObject {
 
     // MARK: - Keychain Service
 
-    private let keychainService = "com.voicetranscriber.apikeys"
+    private let keychainService = "com.verbalize.apikeys"
 
     // MARK: - Published Properties
 
@@ -360,7 +360,7 @@ final class ConfigManager: ObservableObject {
             kSecAttrService as String: keychainService,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
         SecItemAdd(query as CFDictionary, nil)
     }

@@ -18,7 +18,7 @@ struct MenuBarView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("VoiceTranscriber")
+                    Text("Verbalize")
                         .font(.system(size: 13, weight: .semibold))
                     Text(statusText)
                         .font(.system(size: 11))
@@ -38,7 +38,7 @@ struct MenuBarView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .background(Color(nsColor: .controlBackgroundColor))
 
             Divider()
 
@@ -136,6 +136,62 @@ struct MenuBarView: View {
 
             Divider()
 
+            // Translation quick toggle
+            VStack(spacing: 0) {
+                // Toggle row
+                Button(action: {
+                    appState.config.translationEnabled.toggle()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "globe")
+                            .frame(width: 16)
+                            .foregroundColor(appState.config.translationEnabled ? .blue : .secondary)
+                        Text("Translation")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(appState.config.translationEnabled ? "ON" : "OFF")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(appState.config.translationEnabled ? .blue : .secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(appState.config.translationEnabled ? Color.blue.opacity(0.12) : Color(nsColor: .controlBackgroundColor))
+                            )
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                }
+                .buttonStyle(.plain)
+
+                // Language picker (shown when translation is on)
+                if appState.config.translationEnabled {
+                    HStack(spacing: 6) {
+                        Text("Output:")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 34)
+
+                        Picker("", selection: $appState.config.targetLanguage) {
+                            ForEach(ConfigManager.supportedLanguages, id: \.code) { lang in
+                                Text(lang.name).tag(lang.code)
+                            }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .frame(maxWidth: 140)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+                }
+            }
+            .padding(.vertical, 2)
+
+            Divider()
+
             // Hotkey info (dynamically updates)
             HStack(spacing: 6) {
                 Image(systemName: "keyboard")
@@ -167,29 +223,13 @@ struct MenuBarView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
-            // Translation indicator
-            if appState.config.translationEnabled {
-                HStack(spacing: 6) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 10))
-                        .foregroundColor(.blue)
-                    let langName = ConfigManager.supportedLanguages.first(where: { $0.code == appState.config.targetLanguage })?.name ?? appState.config.targetLanguage
-                    Text("Translating to \(langName)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.blue)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 4)
-            }
-
             Divider()
 
             // Bottom buttons
             VStack(spacing: 2) {
                 MenuButton(
                     icon: "macwindow",
-                    label: "Open VoiceTranscriber",
+                    label: "Open Verbalize",
                     action: { appState.showMainWindow() }
                 )
 
@@ -204,7 +244,7 @@ struct MenuBarView: View {
 
                 MenuButton(
                     icon: "power",
-                    label: "Quit VoiceTranscriber",
+                    label: "Quit Verbalize",
                     shortcut: "\u{2318}Q",
                     action: { NSApplication.shared.terminate(nil) }
                 )

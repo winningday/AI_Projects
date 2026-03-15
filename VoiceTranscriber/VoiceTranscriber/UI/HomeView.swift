@@ -284,7 +284,7 @@ private struct TranscriptRow: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color(nsColor: .controlBackgroundColor).opacity(0.6) : Color.clear)
+                .fill(isHovered ? Color(nsColor: .controlBackgroundColor) : Color.clear)
         )
         .onHover { hovering in
             isHovered = hovering

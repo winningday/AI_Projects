@@ -17,7 +17,6 @@ struct AppSettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var micGranted = false
     @State private var axGranted = false
-    @State private var permissionTimer: Timer?
 
     var body: some View {
         ScrollView {
@@ -100,6 +99,11 @@ struct AppSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
+
+                    Text("Tip: You can also toggle translation quickly from the menu bar icon.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .italic()
                 }
 
                 // Extras section
@@ -143,7 +147,7 @@ struct AppSettingsView: View {
                             Text("After enabling in System Settings, click Refresh below.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
-                            Text("Note: You may need to remove and re-add VoiceTranscriber if you rebuilt the app.")
+                            Text("Note: You may need to remove and re-add the app if you rebuilt it.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.orange)
                         }
@@ -214,7 +218,7 @@ struct AppSettingsView: View {
                     LabeledContent("Storage location") {
                         Button("Show in Finder") {
                             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                            let appDir = appSupport.appendingPathComponent("VoiceTranscriber")
+                            let appDir = appSupport.appendingPathComponent("Verbalize")
                             NSWorkspace.shared.open(appDir)
                         }
                         .controlSize(.small)
@@ -226,10 +230,41 @@ struct AppSettingsView: View {
                     .controlSize(.small)
                 }
 
+                // Uninstall section
+                SettingsSection(title: "Clean Uninstall", icon: "trash") {
+                    Text("To completely remove Verbalize and all its data:")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        UninstallStep(number: 1, text: "Quit Verbalize")
+                        UninstallStep(number: 2, text: "Delete from /Applications")
+                        UninstallStep(number: 3, text: "Remove data folder (button below)")
+                        UninstallStep(number: 4, text: "Remove from System Settings > Privacy > Accessibility")
+                        UninstallStep(number: 5, text: "Relaunch System Settings if it feels slow")
+                    }
+
+                    HStack(spacing: 12) {
+                        Button("Open Data Folder") {
+                            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                            let appDir = appSupport.appendingPathComponent("Verbalize")
+                            NSWorkspace.shared.open(appDir)
+                        }
+                        .controlSize(.small)
+
+                        Button("Open Accessibility Settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
                 // About section
                 SettingsSection(title: "About", icon: "info.circle") {
                     LabeledContent("Version") {
-                        Text("1.0.0")
+                        Text("1.1.0")
                             .foregroundColor(.secondary)
                     }
                     LabeledContent("Whisper Model") {
@@ -249,14 +284,6 @@ struct AppSettingsView: View {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
             refreshPermissions()
-            // Poll permissions every 2s to detect changes made in System Settings
-            permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                DispatchQueue.main.async { refreshPermissions() }
-            }
-        }
-        .onDisappear {
-            permissionTimer?.invalidate()
-            permissionTimer = nil
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {
             Button("OK") {}
@@ -276,6 +303,24 @@ struct AppSettingsView: View {
     private func refreshPermissions() {
         micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         axGranted = AXIsProcessTrusted()
+    }
+}
+
+// MARK: - Uninstall Step
+
+private struct UninstallStep: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("\(number).")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.secondary)
+                .frame(width: 16, alignment: .trailing)
+            Text(text)
+                .font(.system(size: 12))
+        }
     }
 }
 

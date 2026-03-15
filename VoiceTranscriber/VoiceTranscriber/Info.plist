@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>VoiceTranscriber</string>
+    <string>Verbalize</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -25,7 +25,7 @@
     <key>LSUIElement</key>
     <false/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>VoiceTranscriber needs microphone access to record your voice for transcription.</string>
+    <string>Verbalize needs microphone access to record your voice for transcription.</string>
     <key>NSMainNibFile</key>
     <string></string>
     <key>NSPrincipalClass</key>

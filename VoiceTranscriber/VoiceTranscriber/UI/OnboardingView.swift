@@ -28,7 +28,7 @@ struct OnboardingView: View {
                         endPoint: .bottomTrailing
                     ))
 
-                Text("Welcome to VoiceTranscriber")
+                Text("Welcome to Verbalize")
                     .font(.system(size: 22, weight: .bold))
 
                 Text("Let's get you set up in a few quick steps")
@@ -98,8 +98,8 @@ struct OnboardingView: View {
         .frame(width: 520, height: 480)
         .onAppear {
             refreshPermissionStatus()
-            // Poll permissions every 2s so UI updates when user grants in System Settings
-            permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            // Poll permissions periodically so UI updates when user grants in System Settings
+            permissionTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
                 DispatchQueue.main.async { refreshPermissionStatus() }
             }
         }
@@ -116,7 +116,7 @@ struct OnboardingView: View {
                 icon: "mic.fill",
                 iconColor: .red,
                 title: "Microphone Access",
-                description: "VoiceTranscriber needs microphone access to record your speech for transcription.",
+                description: "Verbalize needs microphone access to record your speech for transcription.",
                 isGranted: micGranted,
                 actionLabel: micGranted ? "Granted" : "Grant Access",
                 action: requestMicrophoneAccess
@@ -141,7 +141,7 @@ struct OnboardingView: View {
                 icon: "hand.raised.fill",
                 iconColor: .blue,
                 title: "Accessibility Access",
-                description: "Required for global hotkey listening and typing text into other apps. You'll need to add VoiceTranscriber in System Settings.",
+                description: "Required for global hotkey listening and typing text into other apps. You'll need to add Verbalize in System Settings.",
                 isGranted: accessibilityGranted,
                 actionLabel: accessibilityGranted ? "Granted" : "Open Settings",
                 action: openAccessibilitySettings
@@ -152,7 +152,7 @@ struct OnboardingView: View {
                     HelpText("Steps to enable:")
                     NumberedStep(number: 1, text: "Click \"Open Settings\" above")
                     NumberedStep(number: 2, text: "Click the + button")
-                    NumberedStep(number: 3, text: "Find and add VoiceTranscriber")
+                    NumberedStep(number: 3, text: "Find and add Verbalize")
                     NumberedStep(number: 4, text: "Make sure the toggle is ON")
                 }
                 .padding(.horizontal, 20)

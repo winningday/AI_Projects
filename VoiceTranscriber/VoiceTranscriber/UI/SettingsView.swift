@@ -57,7 +57,7 @@ struct SettingsView: View {
                 LabeledContent("Storage") {
                     Button("Show in Finder") {
                         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                        let appDir = appSupport.appendingPathComponent("VoiceTranscriber")
+                        let appDir = appSupport.appendingPathComponent("Verbalize")
                         NSWorkspace.shared.open(appDir)
                     }
                     .controlSize(.small)

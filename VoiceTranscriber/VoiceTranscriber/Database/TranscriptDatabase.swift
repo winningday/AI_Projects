@@ -21,7 +21,16 @@ final class TranscriptDatabase: ObservableObject {
 
     private func setupDatabase() throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appDir = appSupport.appendingPathComponent("VoiceTranscriber", isDirectory: true)
+        // Try new name first, fall back to old name for migration
+        let newDir = appSupport.appendingPathComponent("Verbalize", isDirectory: true)
+        let oldDir = appSupport.appendingPathComponent("VoiceTranscriber", isDirectory: true)
+
+        // Migrate from old directory if it exists and new one doesn't
+        if FileManager.default.fileExists(atPath: oldDir.path) && !FileManager.default.fileExists(atPath: newDir.path) {
+            try? FileManager.default.moveItem(at: oldDir, to: newDir)
+        }
+
+        let appDir = newDir
 
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
 

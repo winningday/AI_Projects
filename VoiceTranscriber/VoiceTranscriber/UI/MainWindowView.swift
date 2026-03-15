@@ -13,7 +13,7 @@ struct MainWindowView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(.linearGradient(
-                                colors: [.accentColor.opacity(0.8), .accentColor.opacity(0.4)],
+                                colors: [Color(red: 0.2, green: 0.15, blue: 0.55), Color(red: 0.12, green: 0.08, blue: 0.47)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ))
@@ -22,7 +22,7 @@ struct MainWindowView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white)
                     }
-                    Text("VoiceTranscriber")
+                    Text("Verbalize")
                         .font(.system(size: 14, weight: .semibold))
                 }
                 .padding(.horizontal, 16)

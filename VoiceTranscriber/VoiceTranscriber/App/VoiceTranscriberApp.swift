@@ -290,7 +290,7 @@ final class AppState: ObservableObject {
                 defer: false
             )
             window.identifier = NSUserInterfaceItemIdentifier("onboarding")
-            window.title = "Setup VoiceTranscriber"
+            window.title = "Setup Verbalize"
             window.center()
             window.contentView = NSHostingView(
                 rootView: OnboardingView(
@@ -314,6 +314,8 @@ final class AppState: ObservableObject {
             showOnboardingWindow()
         } else {
             hotkeyManager.startListening()
+            // Show main window on launch so the app feels like it opened
+            showMainWindow()
         }
     }
 
@@ -338,7 +340,7 @@ final class MainAppWindow: NSWindow {
             defer: false
         )
         self.identifier = NSUserInterfaceItemIdentifier("main")
-        self.title = "VoiceTranscriber"
+        self.title = "Verbalize"
         self.center()
         self.minSize = NSSize(width: 700, height: 450)
         self.contentView = NSHostingView(rootView: MainWindowView(appState: appState))
@@ -373,7 +375,7 @@ final class WindowDelegate: NSObject, NSWindowDelegate {
 // MARK: - App Entry Point
 
 @main
-struct VoiceTranscriberApp: App {
+struct VerbalizeApp: App {
     @StateObject private var appState = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
@@ -383,7 +385,7 @@ struct VoiceTranscriberApp: App {
             MenuBarView(appState: appState)
         } label: {
             Label {
-                Text("VoiceTranscriber")
+                Text("Verbalize")
             } icon: {
                 Image(systemName: menuBarIcon)
             }
