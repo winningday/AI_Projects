@@ -52,13 +52,42 @@ mkdir -p "${MACOS}" "${RESOURCES}"
 cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
 
 # Generate app icon using make-icon.sh
-# The --fix-corners flag handles source images with baked-in rounded corners
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_ICON="${SCRIPT_DIR}/icon.png"
 
 if [ -f "${SOURCE_ICON}" ]; then
-    "${SCRIPT_DIR}/make-icon.sh" --fix-corners "${SOURCE_ICON}" "${RESOURCES}/AppIcon.icns" \
-        || echo "==> Warning: Icon generation failed, continuing without custom icon..."
+    if [ -x "${SCRIPT_DIR}/make-icon.sh" ]; then
+        "${SCRIPT_DIR}/make-icon.sh" "${SOURCE_ICON}" "${RESOURCES}/AppIcon.icns" \
+            || echo "==> Warning: make-icon.sh failed, trying direct iconutil..."
+    fi
+
+    # Fallback: if make-icon.sh didn't produce the .icns, do it inline
+    if [ ! -f "${RESOURCES}/AppIcon.icns" ]; then
+        echo "==> Generating icon via fallback method..."
+        ICON_DIR="${RESOURCES}/AppIcon.iconset"
+        mkdir -p "${ICON_DIR}"
+        TEMP="${ICON_DIR}/_source.png"
+        cp "${SOURCE_ICON}" "${TEMP}"
+        for size in 16 32 64 128 256 512 1024; do
+            sips -z "${size}" "${size}" "${TEMP}" --out "${ICON_DIR}/_s${size}.png" >/dev/null 2>&1
+        done
+        rm -f "${TEMP}"
+        cp "${ICON_DIR}/_s16.png"   "${ICON_DIR}/icon_16x16.png"
+        cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_16x16@2x.png"
+        cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_32x32.png"
+        cp "${ICON_DIR}/_s64.png"   "${ICON_DIR}/icon_32x32@2x.png"
+        cp "${ICON_DIR}/_s128.png"  "${ICON_DIR}/icon_128x128.png"
+        cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_128x128@2x.png"
+        cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_256x256.png"
+        cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_256x256@2x.png"
+        cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_512x512.png"
+        cp "${ICON_DIR}/_s1024.png" "${ICON_DIR}/icon_512x512@2x.png"
+        rm -f "${ICON_DIR}"/_s*.png
+        iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null \
+            && echo "==> App icon generated (fallback)" \
+            || echo "==> Warning: iconutil failed, app will use default icon"
+        rm -rf "${ICON_DIR}"
+    fi
 else
     echo "==> Warning: icon.png not found, skipping icon generation"
 fi
