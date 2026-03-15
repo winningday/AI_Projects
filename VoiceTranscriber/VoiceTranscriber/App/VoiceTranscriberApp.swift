@@ -292,12 +292,17 @@ final class AppState: ObservableObject {
             window.identifier = NSUserInterfaceItemIdentifier("onboarding")
             window.title = "Setup Verbalize"
             window.center()
+            // Prevent dealloc on close — same fix as MainAppWindow to avoid
+            // SIGSEGV in OnboardingView destroy during CoreAnimation flush
+            window.isReleasedWhenClosed = false
+            window.delegate = WindowDelegate.shared
             window.contentView = NSHostingView(
                 rootView: OnboardingView(
                     config: config,
                     hotkeyManager: hotkeyManager,
                     onComplete: { [weak self] in
-                        window.close()
+                        // Hide instead of close to avoid dealloc crash
+                        window.orderOut(nil)
                         self?.hotkeyManager.startListening()
                         self?.showMainWindow()
                     }
@@ -355,7 +360,8 @@ final class WindowDelegate: NSObject, NSWindowDelegate {
     static let shared = WindowDelegate()
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if sender.identifier?.rawValue == "main" {
+        let windowId = sender.identifier?.rawValue
+        if windowId == "main" || windowId == "onboarding" {
             sender.orderOut(nil)
             // Revert to accessory if no visible windows
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

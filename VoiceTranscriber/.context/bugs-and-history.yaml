@@ -8,6 +8,19 @@ fixed_bugs:
     fix: |
       Custom MainAppWindow subclass with isReleasedWhenClosed=false.
       WindowDelegate hides window (orderOut) instead of closing.
+    note: Same fix was later applied to the onboarding window (see below)
+
+  sigsegv_crash_on_onboarding_close:
+    symptom: App crashes with SIGSEGV in "destroy for OnboardingView" when saving API keys
+    root_cause: |
+      Onboarding NSWindow used window.close() in onComplete callback, triggering
+      immediate dealloc of NSHostingView+OnboardingView while CoreAnimation still
+      held references. Same root cause as main window crash.
+    fix: |
+      Added isReleasedWhenClosed=false and WindowDelegate to onboarding window.
+      Changed onComplete to use window.orderOut(nil) instead of window.close().
+      Updated WindowDelegate.windowShouldClose to handle "onboarding" identifier.
+    files: [VoiceTranscriberApp.swift]
       Removed WindowGroup from App body entirely.
     files: [VoiceTranscriberApp.swift]
 
