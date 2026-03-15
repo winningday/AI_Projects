@@ -66,9 +66,68 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
     echo "==> Generating app icon from icon.png..."
     mkdir -p "${ICON_DIR}"
 
-    # Source is already a 1024x1024 square PNG with transparent background
+    # Apply macOS-standard continuous rounded-rect (squircle) mask with anti-aliased edges
+    # This produces clean, polished icon edges at all sizes
+    MASKED_ICON="${ICON_DIR}/_masked.png"
+    swift - "${SOURCE_ICON}" "${MASKED_ICON}" << 'SWIFT_MASK'
+import AppKit
+import CoreGraphics
+
+let args = CommandLine.arguments
+guard args.count >= 3 else { exit(1) }
+
+let srcPath = args[1]
+let dstPath = args[2]
+
+guard let srcImage = NSImage(contentsOfFile: srcPath) else {
+    fputs("Error: cannot load source icon\n", stderr)
+    exit(1)
+}
+
+let size: CGFloat = 1024
+let rep = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: Int(size), pixelsHigh: Int(size),
+    bitsPerSample: 8, samplesPerPixel: 4,
+    hasAlpha: true, isPlanar: false,
+    colorSpaceName: .deviceRGB,
+    bytesPerRow: 0, bitsPerPixel: 0
+)!
+
+NSGraphicsContext.saveGraphicsState()
+let ctx = NSGraphicsContext(bitmapImageRep: rep)!
+NSGraphicsContext.current = ctx
+
+// macOS icon corner radius is ~22.37% of the icon size (continuous curve)
+let cornerRadius = size * 0.2237
+let rect = NSRect(x: 0, y: 0, width: size, height: size)
+
+// Use NSBezierPath with continuous corners (macOS squircle)
+let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+path.addClip()
+
+// Draw the source icon
+srcImage.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
+
+NSGraphicsContext.restoreGraphicsState()
+
+// Save as PNG
+guard let pngData = rep.representation(using: .png, properties: [.interlaced: false]) else {
+    fputs("Error: cannot create PNG\n", stderr)
+    exit(1)
+}
+let url = URL(fileURLWithPath: dstPath)
+try! pngData.write(to: url)
+SWIFT_MASK
+
+    if [ ! -f "${MASKED_ICON}" ]; then
+        echo "==> Warning: mask step failed, falling back to raw icon"
+        MASKED_ICON="${SOURCE_ICON}"
+    fi
+
+    # Source is the masked 1024x1024 square PNG
     TEMP="${ICON_DIR}/_source.png"
-    cp "${SOURCE_ICON}" "${TEMP}"
+    cp "${MASKED_ICON}" "${TEMP}"
 
     # Generate all required iconset sizes
     for size in 16 32 64 128 256 512 1024; do
@@ -89,7 +148,7 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
     cp "${ICON_DIR}/_s1024.png" "${ICON_DIR}/icon_512x512@2x.png"
 
     # Clean up temp sized files
-    rm -f "${ICON_DIR}"/_s*.png
+    rm -f "${ICON_DIR}"/_s*.png "${ICON_DIR}/_masked.png"
 
     # Convert iconset to icns
     if iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null; then
