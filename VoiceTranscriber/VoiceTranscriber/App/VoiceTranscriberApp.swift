@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Combine
 
 // MARK: - App State (Orchestrator)
@@ -11,6 +12,7 @@ final class AppState: ObservableObject {
     @Published var lastTranscript: Transcript?
     @Published var lastError: String?
     @Published var statusMessage: String = "Ready"
+    @Published var showOnboarding = false
 
     let audioRecorder = AudioRecorder()
     let levelMonitor: AudioLevelMonitor
@@ -21,7 +23,6 @@ final class AppState: ObservableObject {
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
     private let recordingWindow = RecordingWindowController()
-    private var currentRecordingURL: URL?
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -50,10 +51,12 @@ final class AppState: ObservableObject {
     func startRecording() {
         guard !isRecording && !isProcessing else { return }
 
-        // Check microphone permission
         AudioRecorder.requestMicrophonePermission { [weak self] granted in
             guard granted else {
-                self?.lastError = "Microphone permission denied. Please grant access in System Settings > Privacy & Security > Microphone."
+                Task { @MainActor [weak self] in
+                    self?.lastError = "Microphone permission denied."
+                    self?.statusMessage = "Mic access needed"
+                }
                 return
             }
 
@@ -62,15 +65,12 @@ final class AppState: ObservableObject {
 
                 do {
                     let url = try self.audioRecorder.startRecording()
-                    self.currentRecordingURL = url
                     self.isRecording = true
                     self.lastError = nil
                     self.statusMessage = "Recording..."
 
-                    // Show floating recording window
                     self.recordingWindow.show(recorder: self.audioRecorder, levelMonitor: self.levelMonitor)
 
-                    // Haptic feedback
                     if self.config.useHapticFeedback {
                         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     }
@@ -97,12 +97,10 @@ final class AppState: ObservableObject {
         statusMessage = "Processing..."
         recordingWindow.hide()
 
-        // Haptic feedback
         if config.useHapticFeedback {
             NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         }
 
-        // Process in background
         Task {
             await processRecording(url: result.url, duration: result.duration)
         }
@@ -125,24 +123,19 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // Step 1: Transcribe with Whisper
             statusMessage = "Transcribing..."
             let rawText = try await whisperClient.transcribe(fileURL: url)
 
             guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                await MainActor.run {
-                    isProcessing = false
-                    statusMessage = "Ready"
-                    lastError = "No speech detected in recording."
-                }
+                isProcessing = false
+                statusMessage = "Ready"
+                lastError = "No speech detected."
                 return
             }
 
-            // Step 2: Clean with Claude
             statusMessage = "Cleaning up..."
             let cleanedText = try await claudeClient.cleanTranscription(rawText)
 
-            // Step 3: Save to database
             let transcript = Transcript(
                 originalText: rawText,
                 cleanedText: cleanedText,
@@ -150,29 +143,23 @@ final class AppState: ObservableObject {
             )
             try database.save(transcript)
 
-            // Step 4: Inject text if enabled
             if config.autoInjectText {
                 TextInjector.inject(text: cleanedText)
             }
 
-            await MainActor.run {
-                lastTranscript = transcript
-                isProcessing = false
-                statusMessage = "Ready"
-                lastError = nil
-            }
+            lastTranscript = transcript
+            isProcessing = false
+            statusMessage = "Ready"
+            lastError = nil
 
-            // Success haptic
             if config.useHapticFeedback {
                 NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
             }
 
         } catch {
-            await MainActor.run {
-                isProcessing = false
-                statusMessage = "Error"
-                lastError = error.localizedDescription
-            }
+            isProcessing = false
+            statusMessage = "Error"
+            lastError = error.localizedDescription
         }
     }
 
@@ -207,7 +194,7 @@ final class AppState: ObservableObject {
             window.makeKeyAndOrderFront(nil)
         } else {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 500, height: 350),
+                contentRect: NSRect(x: 0, y: 0, width: 520, height: 400),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -222,14 +209,41 @@ final class AppState: ObservableObject {
         }
     }
 
+    func showOnboardingWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "onboarding" }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 520, height: 480),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.identifier = NSUserInterfaceItemIdentifier("onboarding")
+            window.title = "Setup VoiceTranscriber"
+            window.center()
+            window.contentView = NSHostingView(
+                rootView: OnboardingView(
+                    config: config,
+                    hotkeyManager: hotkeyManager,
+                    onComplete: { [weak self] in
+                        window.close()
+                        self?.hotkeyManager.startListening()
+                    }
+                )
+            )
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
     // MARK: - Lifecycle
 
     func appDidFinishLaunching() {
-        hotkeyManager.startListening()
-
         if !config.hasCompletedOnboarding {
-            showSettings()
-            config.hasCompletedOnboarding = true
+            showOnboardingWindow()
+        } else {
+            hotkeyManager.startListening()
         }
     }
 
@@ -246,10 +260,9 @@ final class AppState: ObservableObject {
 @main
 struct VoiceTranscriberApp: App {
     @StateObject private var appState = AppState()
-    @Environment(\.openWindow) private var openWindow
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Menu bar extra — the primary UI
         MenuBarExtra {
             MenuBarView(appState: appState)
         } label: {
@@ -261,7 +274,6 @@ struct VoiceTranscriberApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        // Settings window
         Settings {
             SettingsView(config: appState.config, hotkeyManager: appState.hotkeyManager)
         }
@@ -277,13 +289,7 @@ struct VoiceTranscriberApp: App {
 // MARK: - App Delegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var appState: AppState?
-
     func applicationDidFinishLaunching(_ notification: Notification) {
-        appState?.appDidFinishLaunching()
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        appState?.appWillTerminate()
+        // AppState handles its own lifecycle via onAppear
     }
 }

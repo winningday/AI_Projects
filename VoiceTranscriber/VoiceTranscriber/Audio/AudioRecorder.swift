@@ -16,7 +16,7 @@ final class AudioRecorder: ObservableObject {
     private var recordingStartTime: Date?
     private var levelTimer: Timer?
 
-    private let maxLevelHistory = 50 // Number of bars in waveform
+    private let maxLevelHistory = 50
 
     // MARK: - Permissions
 
@@ -38,14 +38,32 @@ final class AudioRecorder: ObservableObject {
     // MARK: - Recording
 
     func startRecording() throws -> URL {
+        // Verify microphone permission before touching AVAudioEngine
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+            throw RecordingError.permissionDenied
+        }
+
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "recording_\(UUID().uuidString).m4a"
         let url = tempDir.appendingPathComponent(fileName)
         self.recordingURL = url
 
         let engine = AVAudioEngine()
-        let inputNode = engine.inputNode
+
+        // Accessing inputNode can crash if no audio input device is available
+        let inputNode: AVAudioInputNode
+        do {
+            inputNode = engine.inputNode
+        } catch {
+            throw RecordingError.engineStartFailed
+        }
+
         let inputFormat = inputNode.outputFormat(forBus: 0)
+
+        // Sanity check: input format must have valid sample rate
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+            throw RecordingError.formatError
+        }
 
         // Create output format: mono 16kHz for Whisper compatibility
         guard let recordingFormat = AVAudioFormat(
@@ -57,7 +75,6 @@ final class AudioRecorder: ObservableObject {
             throw RecordingError.formatError
         }
 
-        // Install a converter if needed
         guard let converter = AVAudioConverter(from: inputFormat, to: recordingFormat) else {
             throw RecordingError.converterError
         }
@@ -77,7 +94,6 @@ final class AudioRecorder: ObservableObject {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
 
-            // Calculate audio level from buffer
             let level = self.calculateLevel(buffer: buffer)
             DispatchQueue.main.async {
                 self.audioLevel = level
@@ -91,6 +107,7 @@ final class AudioRecorder: ObservableObject {
             let frameCount = AVAudioFrameCount(
                 Double(buffer.frameLength) * recordingFormat.sampleRate / inputFormat.sampleRate
             )
+            guard frameCount > 0 else { return }
             guard let convertedBuffer = AVAudioPCMBuffer(
                 pcmFormat: recordingFormat,
                 frameCapacity: frameCount
@@ -104,7 +121,7 @@ final class AudioRecorder: ObservableObject {
 
             converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputBlock)
 
-            if error == nil {
+            if error == nil && convertedBuffer.frameLength > 0 {
                 try? file.write(from: convertedBuffer)
             }
         }
@@ -118,7 +135,9 @@ final class AudioRecorder: ObservableObject {
         // Start duration timer
         levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self = self, let start = self.recordingStartTime else { return }
-            self.recordingDuration = Date().timeIntervalSince(start)
+            DispatchQueue.main.async {
+                self.recordingDuration = Date().timeIntervalSince(start)
+            }
         }
 
         DispatchQueue.main.async {
@@ -139,11 +158,10 @@ final class AudioRecorder: ObservableObject {
 
         let duration = recordingDuration
 
-        // Stop the engine
+        // Stop the engine safely
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
 
-        // Cleanup
         levelTimer?.invalidate()
         levelTimer = nil
         audioEngine = nil
@@ -156,9 +174,16 @@ final class AudioRecorder: ObservableObject {
             self.recordingDuration = 0
         }
 
-        // Play stop sound
         if ConfigManager.shared.playSoundEffects {
             NSSound.beep()
+        }
+
+        // Only return if file actually exists and has content
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+        guard fileSize > 0 else {
+            cleanupTempFile(url: url)
+            return nil
         }
 
         return (url, duration)
@@ -170,7 +195,6 @@ final class AudioRecorder: ObservableObject {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
 
-        // Delete the temp file
         if let url = recordingURL {
             try? FileManager.default.removeItem(at: url)
         }
@@ -193,7 +217,7 @@ final class AudioRecorder: ObservableObject {
     // MARK: - Level Calculation
 
     private func calculateLevel(buffer: AVAudioPCMBuffer) -> Float {
-        guard let channelData = buffer.floatChannelData else { return 0 }
+        guard let channelData = buffer.floatChannelData, buffer.frameLength > 0 else { return 0 }
 
         let channelDataValue = channelData.pointee
         let channelDataArray = stride(
@@ -229,10 +253,10 @@ enum RecordingError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .formatError: return "Failed to create audio format"
-        case .converterError: return "Failed to create audio converter"
-        case .permissionDenied: return "Microphone access denied"
-        case .engineStartFailed: return "Failed to start audio engine"
+        case .formatError: return "Failed to create audio format. Check your microphone."
+        case .converterError: return "Failed to create audio converter."
+        case .permissionDenied: return "Microphone access denied. Grant permission in System Settings > Privacy & Security > Microphone."
+        case .engineStartFailed: return "Failed to start audio engine. Is a microphone connected?"
         }
     }
 }

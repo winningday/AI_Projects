@@ -1,98 +1,206 @@
 import SwiftUI
 
-/// The menu bar extra view that serves as the app's primary interface point.
+/// The menu bar extra view — primary interface for the app.
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Status header
-            HStack {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                Text(statusText)
-                    .font(.headline)
+        VStack(spacing: 0) {
+            // Status header with gradient
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(statusColor.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: statusIcon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(statusColor)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("VoiceTranscriber")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(statusText)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+
                 Spacer()
+
+                // Status badge
+                Text(statusBadge)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(statusColor.opacity(0.12))
+                    )
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
 
             Divider()
 
-            // Quick actions
-            if appState.isRecording {
-                Button(action: { appState.cancelRecording() }) {
-                    Label("Cancel Recording", systemImage: "xmark.circle")
+            // Error banner
+            if let error = appState.lastError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+                        .lineLimit(2)
+                    Spacer()
+                    Button(action: { appState.lastError = nil }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-            } else if appState.isProcessing {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                    Text("Processing...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 12)
-            } else {
-                Button(action: { appState.showTranscriptHistory() }) {
-                    Label("Transcript History", systemImage: "clock.arrow.circlepath")
-                }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.08))
+
+                Divider()
             }
 
-            // Last transcript preview
-            if let last = appState.lastTranscript {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Last transcript:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(last.cleanedText)
-                        .font(.caption)
-                        .lineLimit(3)
-                        .frame(maxWidth: 250, alignment: .leading)
-
-                    Button(action: { copyToClipboard(last.cleanedText) }) {
-                        Label("Copy", systemImage: "doc.on.doc")
-                            .font(.caption)
+            // Actions
+            VStack(spacing: 2) {
+                if appState.isRecording {
+                    MenuButton(
+                        icon: "stop.circle.fill",
+                        label: "Cancel Recording",
+                        color: .red,
+                        action: { appState.cancelRecording() }
+                    )
+                } else if appState.isProcessing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(appState.statusMessage)
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Spacer()
                     }
-                    .buttonStyle(.borderless)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                } else {
+                    MenuButton(
+                        icon: "clock.arrow.circlepath",
+                        label: "Transcript History",
+                        action: { appState.showTranscriptHistory() }
+                    )
                 }
-                .padding(.horizontal, 12)
+            }
+            .padding(.vertical, 4)
+
+            // Last transcript preview
+            if let last = appState.lastTranscript, !appState.isRecording && !appState.isProcessing {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("LAST TRANSCRIPT")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .tracking(0.5)
+
+                    Text(last.cleanedText)
+                        .font(.system(size: 12))
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 12) {
+                        Text(last.formattedTimestamp)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Button(action: { copyToClipboard(last.cleanedText) }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "doc.on.doc")
+                                Text("Copy")
+                            }
+                            .font(.system(size: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.accentColor)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
 
             Divider()
 
             // Hotkey info
-            HStack {
-                Text("Hotkey:")
-                    .font(.caption)
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
+                Text("Hold")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
                 Text(appState.hotkeyDescription)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            )
+                    )
+
+                Text("to record")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
                 Spacer()
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
 
             Divider()
 
-            Button(action: { appState.showSettings() }) {
-                Label("Settings...", systemImage: "gear")
-            }
-            .padding(.horizontal, 8)
-            .keyboardShortcut(",", modifiers: .command)
+            // Bottom buttons
+            VStack(spacing: 2) {
+                MenuButton(
+                    icon: "gear",
+                    label: "Settings...",
+                    shortcut: "⌘,",
+                    action: { appState.showSettings() }
+                )
 
-            Button(action: { NSApplication.shared.terminate(nil) }) {
-                Label("Quit VoiceTranscriber", systemImage: "power")
+                MenuButton(
+                    icon: "arrow.counterclockwise",
+                    label: "Run Setup Again",
+                    action: { appState.showOnboardingWindow() }
+                )
+
+                Divider()
+                    .padding(.horizontal, 8)
+
+                MenuButton(
+                    icon: "power",
+                    label: "Quit VoiceTranscriber",
+                    shortcut: "⌘Q",
+                    action: { NSApplication.shared.terminate(nil) }
+                )
             }
-            .padding(.horizontal, 8)
-            .keyboardShortcut("q", modifiers: .command)
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
-        .frame(width: 280)
+        .frame(width: 300)
+        .onAppear {
+            appState.appDidFinishLaunching()
+        }
     }
 
     // MARK: - Helpers
@@ -100,17 +208,64 @@ struct MenuBarView: View {
     private var statusColor: Color {
         if appState.isRecording { return .red }
         if appState.isProcessing { return .orange }
+        if appState.lastError != nil { return .orange }
         return .green
     }
 
+    private var statusIcon: String {
+        if appState.isRecording { return "mic.fill" }
+        if appState.isProcessing { return "arrow.triangle.2.circlepath" }
+        return "mic"
+    }
+
     private var statusText: String {
-        if appState.isRecording { return "Recording..." }
-        if appState.isProcessing { return "Processing..." }
-        return "Ready"
+        if appState.isRecording { return "Recording audio..." }
+        if appState.isProcessing { return appState.statusMessage }
+        if appState.lastError != nil { return "Error occurred" }
+        return "Ready to record"
+    }
+
+    private var statusBadge: String {
+        if appState.isRecording { return "REC" }
+        if appState.isProcessing { return "BUSY" }
+        return "READY"
     }
 
     private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+// MARK: - Menu Button
+
+private struct MenuButton: View {
+    let icon: String
+    let label: String
+    var color: Color = .primary
+    var shortcut: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .frame(width: 16)
+                    .foregroundColor(color == .primary ? .secondary : color)
+                Text(label)
+                    .font(.system(size: 13))
+                    .foregroundColor(color)
+                Spacer()
+                if let shortcut = shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                }
+            }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+        }
+        .buttonStyle(.plain)
     }
 }

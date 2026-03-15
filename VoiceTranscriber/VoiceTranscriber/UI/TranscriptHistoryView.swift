@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Displays a searchable, scrollable list of all past transcriptions.
+/// Displays a searchable list of all past transcriptions with a detail pane.
 struct TranscriptHistoryView: View {
     @ObservedObject var database: TranscriptDatabase
     @State private var searchText = ""
@@ -9,37 +9,32 @@ struct TranscriptHistoryView: View {
 
     var body: some View {
         NavigationSplitView {
-            // Sidebar: transcript list
             VStack(spacing: 0) {
                 // Search bar
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
+                        .font(.system(size: 12))
                     TextField("Search transcripts...", text: $searchText)
                         .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .padding(8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
                 .background(Color(nsColor: .controlBackgroundColor))
 
                 Divider()
 
-                // Transcript list
                 if filteredTranscripts.isEmpty {
-                    VStack(spacing: 12) {
-                        Spacer()
-                        Image(systemName: "text.bubble")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                        Text(searchText.isEmpty ? "No transcripts yet" : "No matching transcripts")
-                            .foregroundColor(.secondary)
-                        if searchText.isEmpty {
-                            Text("Press your hotkey to start recording")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
+                    emptyState
                 } else {
                     List(filteredTranscripts, selection: $selectedTranscript) { transcript in
                         TranscriptRowView(transcript: transcript)
@@ -54,36 +49,54 @@ struct TranscriptHistoryView: View {
                                 Divider()
                                 Button("Delete", role: .destructive) {
                                     try? database.delete(transcript)
+                                    if selectedTranscript?.id == transcript.id {
+                                        selectedTranscript = nil
+                                    }
                                 }
                             }
                     }
+                    .listStyle(.sidebar)
                 }
             }
-            .frame(minWidth: 250)
+            .frame(minWidth: 260)
             .toolbar {
                 ToolbarItem(placement: .automatic) {
-                    Button(action: { showDeleteConfirmation = true }) {
-                        Image(systemName: "trash")
+                    HStack(spacing: 4) {
+                        Text("\(filteredTranscripts.count)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
+
+                        Button(action: { showDeleteConfirmation = true }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 12))
+                        }
+                        .disabled(database.transcripts.isEmpty)
+                        .help("Clear all transcripts")
                     }
-                    .disabled(database.transcripts.isEmpty)
-                    .help("Clear all transcripts")
                 }
             }
         } detail: {
-            // Detail view
             if let transcript = selectedTranscript {
                 TranscriptDetailView(transcript: transcript)
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     Image(systemName: "text.cursor")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 44))
+                        .foregroundStyle(.linearGradient(
+                            colors: [.blue.opacity(0.4), .purple.opacity(0.4)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                     Text("Select a transcript to view details")
+                        .font(.system(size: 14))
                         .foregroundColor(.secondary)
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .frame(minWidth: 650, minHeight: 420)
         .alert("Clear All Transcripts", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete All", role: .destructive) {
@@ -91,9 +104,39 @@ struct TranscriptHistoryView: View {
                 selectedTranscript = nil
             }
         } message: {
-            Text("This will permanently delete all transcript history. This action cannot be undone.")
+            Text("This will permanently delete all transcript history. This cannot be undone.")
         }
     }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: searchText.isEmpty ? "waveform.badge.plus" : "magnifyingglass")
+                .font(.system(size: 36))
+                .foregroundStyle(.linearGradient(
+                    colors: [.blue.opacity(0.5), .purple.opacity(0.5)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+
+            Text(searchText.isEmpty ? "No transcripts yet" : "No matching transcripts")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+
+            if searchText.isEmpty {
+                Text("Press your hotkey to start recording.\nTranscripts will appear here.")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                    .multilineTextAlignment(.center)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Helpers
 
     private var filteredTranscripts: [Transcript] {
         if searchText.isEmpty {
@@ -118,29 +161,32 @@ struct TranscriptRowView: View {
     let transcript: Transcript
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(transcript.cleanedText)
                 .font(.system(size: 13))
                 .lineLimit(2)
 
-            HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                    .font(.system(size: 9))
                 Text(transcript.formattedTimestamp)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
+
                 Spacer()
+
+                Image(systemName: "timer")
+                    .font(.system(size: 9))
                 Text(formattedDuration)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
             }
+            .foregroundColor(.secondary)
         }
         .padding(.vertical, 4)
     }
 
     private var formattedDuration: String {
         let seconds = Int(transcript.durationSeconds)
-        if seconds < 60 {
-            return "\(seconds)s"
-        }
+        if seconds < 60 { return "\(seconds)s" }
         return "\(seconds / 60)m \(seconds % 60)s"
     }
 }
@@ -149,75 +195,118 @@ struct TranscriptRowView: View {
 
 struct TranscriptDetailView: View {
     let transcript: Transcript
+    @State private var copiedField: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
-                HStack {
+                HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(transcript.formattedTimestamp)
-                            .font(.headline)
-                        Text("Duration: \(String(format: "%.1f", transcript.durationSeconds))s")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 18, weight: .semibold))
+                        HStack(spacing: 12) {
+                            Label(
+                                String(format: "%.1fs", transcript.durationSeconds),
+                                systemImage: "timer"
+                            )
+                            Label(
+                                "\(transcript.cleanedText.split(separator: " ").count) words",
+                                systemImage: "textformat.abc"
+                            )
+                        }
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                     }
                     Spacer()
                 }
 
-                // Cleaned text
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("Cleaned Text", systemImage: "sparkles")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            Spacer()
-                            Button(action: { copyToClipboard(transcript.cleanedText) }) {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy cleaned text")
-                        }
-
-                        Text(transcript.cleanedText)
-                            .font(.body)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                // Cleaned text card
+                TextCard(
+                    title: "Cleaned Text",
+                    icon: "sparkles",
+                    iconColor: .purple,
+                    text: transcript.cleanedText,
+                    isCopied: copiedField == "cleaned",
+                    onCopy: {
+                        copyToClipboard(transcript.cleanedText)
+                        copiedField = "cleaned"
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copiedField = nil }
                     }
-                    .padding(4)
-                }
+                )
 
-                // Original text
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("Original Transcription", systemImage: "waveform")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            Spacer()
-                            Button(action: { copyToClipboard(transcript.originalText) }) {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy original text")
-                        }
-
-                        Text(transcript.originalText)
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                // Original text card
+                TextCard(
+                    title: "Original Transcription",
+                    icon: "waveform",
+                    iconColor: .blue,
+                    text: transcript.originalText,
+                    isSecondary: true,
+                    isCopied: copiedField == "original",
+                    onCopy: {
+                        copyToClipboard(transcript.originalText)
+                        copiedField = "original"
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copiedField = nil }
                     }
-                    .padding(4)
-                }
+                )
             }
-            .padding(20)
+            .padding(24)
         }
     }
 
     private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+// MARK: - Text Card
+
+private struct TextCard: View {
+    let title: String
+    let icon: String
+    let iconColor: Color
+    let text: String
+    var isSecondary: Bool = false
+    var isCopied: Bool = false
+    let onCopy: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(iconColor)
+                    .font(.system(size: 12))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button(action: onCopy) {
+                    HStack(spacing: 3) {
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        Text(isCopied ? "Copied!" : "Copy")
+                    }
+                    .font(.system(size: 11))
+                    .foregroundColor(isCopied ? .green : .accentColor)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundColor(isSecondary ? .secondary : .primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineSpacing(4)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
+        )
     }
 }
