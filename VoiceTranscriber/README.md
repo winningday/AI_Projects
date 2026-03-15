@@ -19,7 +19,7 @@ A privacy-first macOS voice-to-text application with real-time translation. Reco
 - **Transcript history** — Searchable local SQLite database of all past transcriptions with WPM stats
 - **Configurable hotkey** — Rebind to any key or key combination in Settings
 - **Smart formatting** — Auto-detects code, technical terms, numbered lists
-- **Secure key storage** — API keys stored in macOS Keychain, not in plaintext files
+- **Secure key storage** — API keys stored with obfuscation in UserDefaults (auto-migrated from Keychain on upgrade)
 - **Menu bar app** — Lives in the menu bar with quick translation toggle and language picker
 
 ## Supported Translation Languages
@@ -45,7 +45,7 @@ open .build/release/
 open .build/release/Verbalize-1.1.0.dmg
 ```
 
-This builds the app, generates the app icon from `icon.png`, and creates a DMG installer at `.build/release/Verbalize-1.1.0.dmg`.
+This builds the app, generates the app icon from `icon.png`, and creates a DMG installer at `.build/release/Verbalize-1.2.0.dmg`.
 
 To install directly without a DMG:
 ```bash
@@ -59,14 +59,14 @@ On first launch, Verbalize walks you through a guided setup:
 
 1. **Microphone permission** — Required for audio recording
 2. **Accessibility permission** — Required for global hotkey and text injection
-3. **API keys** — Enter your OpenAI and Anthropic keys (stored in Keychain)
+3. **API keys** — Enter your OpenAI and Anthropic keys (stored securely in UserDefaults)
 
 ### 3. API Keys
 
 - **OpenAI API Key** — Get one at [platform.openai.com](https://platform.openai.com/api-keys)
 - **Anthropic API Key** — Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys)
 
-Keys are stored securely in the macOS Keychain. Alternatively, set environment variables:
+Keys are stored with base64 obfuscation in UserDefaults. Alternatively, set environment variables:
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
@@ -144,7 +144,7 @@ VoiceTranscriber/
 │   │   └── HotKeyManager.swift           # CGEvent tap + NSEvent fallback
 │   └── Utils/
 │       ├── TextInjection.swift           # AX API / pasteboard text injection
-│       └── ConfigManager.swift           # Keychain + UserDefaults + translation config
+│       └── ConfigManager.swift           # UserDefaults config + API keys + Keychain migration
 └── .gitignore
 ```
 
@@ -172,7 +172,20 @@ Window management uses `isReleasedWhenClosed = false` and a custom `WindowDelega
 |---------|---------|
 | [GRDB.swift](https://github.com/groue/GRDB.swift) | SQLite database for transcript history |
 
-All other functionality uses native frameworks: AVFoundation, AppKit, SwiftUI, Security (Keychain), Quartz Event Services.
+All other functionality uses native frameworks: AVFoundation, AppKit, SwiftUI, Security, Quartz Event Services.
+
+## Upgrading from v1.1
+
+Just build and replace — no manual cleanup needed. On first launch, v1.2 automatically:
+
+1. **Migrates API keys** from the old Keychain (com.verbalize.apikeys) to UserDefaults
+2. **Deletes old Keychain entries** so you never see a password prompt
+3. **Preserves all settings**, transcript history, dictionary, and style profiles
+
+```bash
+./build.sh release
+# Replace /Applications/Verbalize.app with the new build
+```
 
 ## Clean Uninstall
 
@@ -212,7 +225,6 @@ defaults delete com.verbalize.app 2>/dev/null
 - Verify your API keys are correct in Settings
 - Check your OpenAI/Anthropic account has sufficient credits
 - Ensure network connectivity
-- Re-save keys if you get password prompts (old Keychain entries may have stricter access)
 
 **System Settings lagging:**
 - If you deleted and rebuilt the app, the old entry in Accessibility settings may cause lag
