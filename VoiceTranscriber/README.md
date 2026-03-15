@@ -205,6 +205,18 @@ defaults delete com.verbalize.app 2>/dev/null
 
 # 5. Remove from System Settings > Privacy & Security > Accessibility
 #    (open manually and remove Verbalize from the list)
+tccutil reset All com.your.app.bundleid
+
+#    in /Applications:
+
+osascript -e 'id of app "Verbalize"'
+
+# That returns something like:
+
+com.google.Chrome
+
+#   Then run: 
+tccutil reset All com.your.app.bundleid
 
 # 6. If System Settings feels slow, relaunch it
 ```
