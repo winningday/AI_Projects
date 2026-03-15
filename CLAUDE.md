@@ -2,14 +2,15 @@
 
 ## Rules
 
-1. **Stay in scope** — only read, search, and explore files inside the specific project folder you're working on. Never browse or pull files from sibling project directories. This is a monorepo — each folder is an independent project.
-2. **Always update README.md** inside the relevant project folder after any code changes
-3. **Always update the project's `.context/` files** when architecture, files, or features change
-4. **Read `.context/overview.yaml` first** before diving into code — it has the map
-5. **Don't read all source files** — use `.context/` files to find what you need, then read only those files
-6. **Commit and push** after completing work — never leave uncommitted changes
-7. **Branch naming**: always use `claude/` prefix with session suffix
-8. **UI/UX first** — always design intuitive, polished interfaces that match the app's visual theme. Use proper toggle controls, clear labels, consistent spacing, and native macOS patterns. Never use plain text buttons where proper controls exist.
+1. **Stay in scope** — this is a monorepo. Each folder is an independent project. Only read, search, and modify files inside the specific project folder you're working on. Never touch sibling project directories.
+2. **Keep branches clean** — when you need to pull updates from main, do NOT run `git pull origin main` or `git merge origin/main` as this drags in every project's files. Instead, cherry-pick only the commits relevant to your project, or use `git checkout origin/main -- <project-folder>/` to pull just the files you need from a specific subdirectory.
+3. **Always update README.md** inside the relevant project folder after any code changes
+4. **Always update the project's `.context/` files** when architecture, files, or features change
+5. **Read `.context/overview.yaml` first** before diving into code — it has the map
+6. **Don't read all source files** — use `.context/` files to find what you need, then read only those files
+7. **Commit and push** after completing work — never leave uncommitted changes
+8. **Branch naming**: always use `claude/` prefix with session suffix
+9. **UI/UX first** — always design intuitive, polished interfaces that match the app's visual theme. Use proper toggle controls, clear labels, consistent spacing, and native macOS patterns. Never use plain text buttons where proper controls exist.
 
 ## Projects
 
