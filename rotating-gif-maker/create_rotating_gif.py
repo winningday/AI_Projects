@@ -16,7 +16,100 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
+
+
+# ---------------------------------------------------------------------------
+# Auto face extraction — detect face, smart-crop, remove background
+# ---------------------------------------------------------------------------
+
+def detect_face(img: Image.Image):
+    """
+    Returns (x, y, w, h) of the largest detected face, or None.
+    Uses OpenCV Haar cascade — no GPU, no model downloads.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        print("  [warn] opencv-python not installed — skipping face detection.")
+        return None
+
+    arr = np.array(img.convert("RGB"))
+    gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+    cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    )
+    faces = cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)
+    )
+    if len(faces) == 0:
+        return None
+    # Return the largest face by area
+    return max(faces, key=lambda f: f[2] * f[3])
+
+
+def extract_face(img: Image.Image) -> Image.Image | None:
+    """
+    Auto-detects a face, removes the background, and isolates just the head
+    (face + hair + neck) — excluding arms, hands, other people, etc.
+
+    Strategy (two masks, intersected):
+      1. rembg on the full image → removes the actual BACKGROUND (walls, etc.)
+      2. Elliptical head mask from face bbox → removes any FOREGROUND body parts
+         (arms/fingers) that rembg kept but are outside the head silhouette.
+      3. min(rembg_alpha, ellipse) = clean head, no fingers, no background.
+
+    No alpha gradients — GIF only supports binary transparency.
+    """
+    face = detect_face(img)
+    if face is None:
+        return None
+
+    import cv2
+    import numpy as np
+
+    fx, fy, fw, fh = face
+    w, h = img.size
+    cx, cy = fx + fw // 2, fy + fh // 2
+    print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
+
+    # --- rembg on full image (full context = best segmentation) --------
+    try:
+        from rembg import remove, new_session
+        print("  Removing background (isnet-general-use)…")
+        session = new_session("isnet-general-use")
+        rgba = remove(img.convert("RGB"), session=session)
+    except ImportError:
+        print("  [warn] rembg not installed — skipping background removal.")
+        rgba = img.convert("RGBA")
+
+    rembg_alpha = np.array(rgba.split()[3])
+
+    # --- Elliptical head mask ------------------------------------------
+    # Shaped to match a head: wide enough for ears/hair, tall for hair + neck.
+    # The intersection with rembg clips arms/fingers that extend beyond
+    # the head silhouette while keeping the face, hair, and neck.
+    ell_a = int(fw * 0.58)    # horizontal semi-axis (ears + hair sides)
+    ell_b = int(fh * 0.82)    # vertical semi-axis  (hair top + neck bottom)
+    ellipse_mask = np.zeros((h, w), dtype=np.uint8)
+    cv2.ellipse(ellipse_mask, center=(cx, cy),
+                axes=(ell_a, ell_b), angle=0,
+                startAngle=0, endAngle=360,
+                color=255, thickness=-1)
+    print(f"  Head ellipse: center=({cx},{cy}) axes=({ell_a},{ell_b})")
+
+    # --- Intersect: rembg handles bg, ellipse handles stray body parts --
+    combined_alpha = np.minimum(rembg_alpha, ellipse_mask)
+    result = rgba.copy()
+    result.putalpha(Image.fromarray(combined_alpha))
+
+    # --- Place on square canvas centered on face -----------------------
+    half_canvas = int(fh * 0.85)
+    canvas_size = half_canvas * 2
+    canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    canvas.paste(result, (half_canvas - cx, half_canvas - cy))
+    return canvas
 
 
 # ---------------------------------------------------------------------------
@@ -68,8 +161,11 @@ def crop_interactive(img: Image.Image) -> Image.Image:
 # Round / circular mask (optional)
 # ---------------------------------------------------------------------------
 
-def apply_circular_mask(img: Image.Image) -> Image.Image:
-    """Crop image to a circle (keeps transparency)."""
+def apply_circular_mask(img: Image.Image, feather: int = 2) -> Image.Image:
+    """Crop image to a circle with a softly feathered edge.
+    Multiplies the existing alpha (from rembg / gradient fade) with the
+    circle mask so prior transparency is preserved, not overwritten."""
+    import numpy as np
     img = img.convert("RGBA")
     size = min(img.size)
     img = img.crop(((img.width - size) // 2,
@@ -77,9 +173,14 @@ def apply_circular_mask(img: Image.Image) -> Image.Image:
                     (img.width + size) // 2,
                     (img.height + size) // 2))
     mask = Image.new("L", (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, size - 1, size - 1), fill=255)
-    img.putalpha(mask)
+    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+    if feather > 0:
+        mask = mask.filter(ImageFilter.GaussianBlur(feather))
+    # Multiply existing alpha by circle mask instead of replacing it
+    existing = np.array(img.split()[3], dtype=np.float32)
+    circle   = np.array(mask, dtype=np.float32)
+    combined = (existing * circle / 255.0).clip(0, 255).astype(np.uint8)
+    img.putalpha(Image.fromarray(combined))
     return img
 
 
@@ -221,13 +322,21 @@ def main() -> None:
     parser.add_argument("--input",  "-i", required=True,  help="Input image path")
     parser.add_argument("--output", "-o", default=None,   help="Output GIF path (default: <input>_rotating.gif)")
 
+    # Face extraction
+    parser.add_argument("--face", action="store_true",
+                        help="Auto-detect and extract face (smart crop + bg removal)")
+    parser.add_argument("--auto", action="store_true", default=True,
+                        help="Auto-detect face and use face pipeline if found (default: on)")
+    parser.add_argument("--no-auto", dest="auto", action="store_false",
+                        help="Disable auto face detection")
+
     # Crop / size
     parser.add_argument("--crop",   nargs=2, type=int, metavar=("W", "H"),
                         help="Crop a W×H region from the centre of the image")
     parser.add_argument("--interactive-crop", action="store_true",
                         help="Interactively enter a crop region")
-    parser.add_argument("--size",   type=int, default=80,
-                        help="Final canvas size in pixels (square). Default: 80")
+    parser.add_argument("--size",   type=int, default=120,
+                        help="Final canvas size in pixels (square). Default: 120")
     parser.add_argument("--circle", action="store_true",
                         help="Apply a circular mask to the image")
 
@@ -246,10 +355,10 @@ def main() -> None:
                         help="Rotation direction: cw (clockwise) or ccw. Default: cw")
     parser.add_argument("--loop",     type=int,   default=0,
                         help="Number of loops (0 = infinite). Default: 0")
-    parser.add_argument("--colors",   type=int,   default=32,
-                        help="Palette size (2-256). Fewer = smaller file. Default: 32")
-    parser.add_argument("--lossy",    type=int,   default=30,
-                        help="gifsicle lossy level (0=lossless, 80=aggressive). Default: 30")
+    parser.add_argument("--colors",   type=int,   default=128,
+                        help="Palette size (2-256). Fewer = smaller file. Default: 128")
+    parser.add_argument("--lossy",    type=int,   default=10,
+                        help="gifsicle lossy level (0=lossless, 80=aggressive). Default: 10")
 
     args = parser.parse_args()
 
@@ -264,21 +373,40 @@ def main() -> None:
     print(f"Loading: {input_path}")
     img = Image.open(input_path).convert("RGBA")
 
-    # ---- Background removal ------------------------------------------------
-    if args.remove_bg:
-        img = remove_background(img)
+    # ---- Face extraction (auto or explicit) --------------------------------
+    use_face_pipeline = args.face
+    if not use_face_pipeline and args.auto:
+        print("  Auto-detecting face…")
+        face = detect_face(img)
+        if face is not None:
+            print("  Face found — using face extraction pipeline.")
+            use_face_pipeline = True
+        else:
+            print("  No face detected — using standard pipeline.")
 
-    # ---- Crop --------------------------------------------------------------
-    if args.crop:
-        print(f"  Cropping to centre {args.crop[0]}×{args.crop[1]}…")
-        img = crop_center(img, args.crop[0], args.crop[1])
-    elif args.interactive_crop:
-        img = crop_interactive(img)
+    if use_face_pipeline:
+        extracted = extract_face(img)
+        if extracted is not None:
+            img = extracted
+            # Always apply circular mask for face output
+            print("  Applying circular mask…")
+            img = apply_circular_mask(img)
+        else:
+            print("  [warn] Face extraction failed — falling back to standard pipeline.")
+    else:
+        # ---- Standard pipeline ---------------------------------------------
+        if args.remove_bg:
+            img = remove_background(img)
 
-    # ---- Circular mask -----------------------------------------------------
-    if args.circle:
-        print("  Applying circular mask…")
-        img = apply_circular_mask(img)
+        if args.crop:
+            print(f"  Cropping to centre {args.crop[0]}×{args.crop[1]}…")
+            img = crop_center(img, args.crop[0], args.crop[1])
+        elif args.interactive_crop:
+            img = crop_interactive(img)
+
+        if args.circle:
+            print("  Applying circular mask…")
+            img = apply_circular_mask(img)
 
     # ---- Resize to final canvas size ---------------------------------------
     size = args.size
