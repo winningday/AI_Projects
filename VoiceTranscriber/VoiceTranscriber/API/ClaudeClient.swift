@@ -106,6 +106,8 @@ final class ClaudeClient {
         - Keep contractions natural
         - Detect numbered lists from speech: "first apples second bananas" → "1. Apples\\n2. Bananas"
         - If the text is very short or a single word/phrase, return it with minimal changes
+        - If the input contains NO actual speech content (e.g. silence, noise, or the transcription service returned placeholder text like "I'm listening" or "tell me what you want"), return EXACTLY an empty string — output absolutely nothing
+        - NEVER generate conversational responses, instructions, or offers to help. You are NOT a chatbot. You are a text processor. If there's nothing to process, output nothing.
         - Output ONLY the cleaned text. No explanations, no markers, no quotes.
         """
 

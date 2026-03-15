@@ -71,6 +71,30 @@ fixed_bugs:
     fix: Added showMainWindow() call in appDidFinishLaunching after onboarding
     files: [VoiceTranscriberApp.swift]
 
+  claude_chatbot_response_in_translation:
+    symptom: When no speech detected in translation mode, Claude responds conversationally ("ok i'm listening, tell me what you want and i will translate")
+    root_cause: System prompt didn't explicitly forbid generating conversational responses on empty/noise input
+    fix: Added rules to return empty string when no actual speech content is present, and never act as chatbot
+    files: [ClaudeClient.swift]
+
+  dock_icon_opens_window:
+    symptom: Clicking the dock icon opens the main app window
+    root_cause: applicationShouldHandleReopen was coded to re-open the main window on dock click
+    fix: Changed to return false — menu-bar-first app, users open via "Open Verbalize" in menu bar
+    files: [VoiceTranscriberApp.swift]
+
+  translation_toggle_visual_state:
+    symptom: Menu bar translation toggle turns off but still displays as "ON"
+    root_cause: Button action toggled correctly but the plain text button style wasn't reactive to state changes
+    fix: Redesigned as segmented Off/On toggle with explicit set-to-false and set-to-true buttons, proper highlighting
+    files: [MenuBarView.swift]
+
+  wpm_always_zero:
+    symptom: WPM stat card always shows 0
+    root_cause: Guard required totalRecordingSeconds > 30 — too high for new users
+    fix: Lowered to > 5 seconds. Also moved detailed stats to new Stats tab.
+    files: [VoiceTranscriberApp.swift]
+
 open_issues:
   transcription_may_not_work:
     symptom: User reported transcription stopped working in new build

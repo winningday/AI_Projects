@@ -463,16 +463,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            // Re-open main window when dock icon is clicked and all windows are closed
-            for window in NSApp.windows {
-                if window.identifier?.rawValue == "main" {
-                    window.makeKeyAndOrderFront(nil)
-                    NSApp.setActivationPolicy(.regular)
-                    return true
-                }
-            }
-        }
-        return true
+        // Menu-bar-first app — dock icon clicks should not open windows.
+        // Users open the main window from the menu bar "Open Verbalize" button.
+        return false
     }
 }

@@ -137,33 +137,50 @@ struct MenuBarView: View {
             Divider()
 
             // Translation quick toggle
-            VStack(spacing: 0) {
-                // Toggle row
-                Button(action: {
-                    appState.config.translationEnabled.toggle()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "globe")
-                            .frame(width: 16)
-                            .foregroundColor(appState.config.translationEnabled ? .blue : .secondary)
-                        Text("Translation")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Text(appState.config.translationEnabled ? "ON" : "OFF")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(appState.config.translationEnabled ? .blue : .secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(appState.config.translationEnabled ? Color.blue.opacity(0.12) : Color(nsColor: .controlBackgroundColor))
-                            )
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 12))
+                        .foregroundColor(appState.config.translationEnabled ? .blue : .secondary)
+
+                    Text("Translation")
+                        .font(.system(size: 13))
+
+                    Spacer()
+
+                    // Segmented OFF / ON toggle
+                    HStack(spacing: 0) {
+                        Button(action: { appState.config.translationEnabled = false }) {
+                            Text("Off")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(!appState.config.translationEnabled ? .primary : .secondary)
+                                .frame(width: 36, height: 20)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(!appState.config.translationEnabled ? Color(nsColor: .controlBackgroundColor) : Color.clear)
+                                        .shadow(color: !appState.config.translationEnabled ? .black.opacity(0.1) : .clear, radius: 1, y: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { appState.config.translationEnabled = true }) {
+                            Text("On")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(appState.config.translationEnabled ? .white : .secondary)
+                                .frame(width: 36, height: 20)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(appState.config.translationEnabled ? Color.blue : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .contentShape(Rectangle())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .padding(2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color(nsColor: .separatorColor).opacity(0.3))
+                    )
                 }
-                .buttonStyle(.plain)
 
                 // Language picker (shown when translation is on)
                 if appState.config.translationEnabled {
@@ -171,7 +188,7 @@ struct MenuBarView: View {
                         Text("Output:")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
-                            .padding(.leading, 34)
+                            .padding(.leading, 20)
 
                         Picker("", selection: Binding(
                             get: { appState.config.targetLanguage },
@@ -187,11 +204,10 @@ struct MenuBarView: View {
 
                         Spacer()
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
 
             Divider()
 

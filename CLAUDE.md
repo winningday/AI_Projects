@@ -8,6 +8,7 @@
 4. **Don't read all source files** — use `.context/` files to find what you need, then read only those files
 5. **Commit and push** after completing work — never leave uncommitted changes
 6. **Branch naming**: always use `claude/` prefix with session suffix
+7. **UI/UX first** — always design intuitive, polished interfaces that match the app's visual theme. Use proper toggle controls, clear labels, consistent spacing, and native macOS patterns. Never use plain text buttons where proper controls exist.
 
 ## Projects
 
