@@ -412,6 +412,10 @@ final class MainAppWindow: NSWindow {
         self.title = "Verbalize"
         self.center()
         self.minSize = NSSize(width: 700, height: 450)
+        self.titlebarAppearsTransparent = false
+        self.titleVisibility = .visible
+        self.isOpaque = true
+        self.backgroundColor = .windowBackgroundColor
         self.contentView = NSHostingView(rootView: MainWindowView(appState: appState))
         self.isReleasedWhenClosed = false
         self.delegate = WindowDelegate.shared

@@ -42,7 +42,7 @@ git clone <repo-url>
 cd VoiceTranscriber
 ./build.sh release --dmg
 open .build/release/
-open .build/release/Verbalize-1.1.0.dmg
+open .build/release/Verbalize-1.2.0.dmg
 ```
 
 This builds the app, generates the app icon from `icon.png`, and creates a DMG installer at `.build/release/Verbalize-1.2.0.dmg`.
@@ -205,18 +205,6 @@ defaults delete com.verbalize.app 2>/dev/null
 
 # 5. Remove from System Settings > Privacy & Security > Accessibility
 #    (open manually and remove Verbalize from the list)
-tccutil reset All com.your.app.bundleid
-
-#    in /Applications:
-
-osascript -e 'id of app "Verbalize"'
-
-# That returns something like:
-
-com.google.Chrome
-
-#   Then run: 
-tccutil reset All com.your.app.bundleid
 
 # 6. If System Settings feels slow, relaunch it
 ```
