@@ -1,0 +1,65 @@
+# Verbalize — Bug History & Fixes
+# Reference for past issues so we don't regress or re-investigate.
+
+fixed_bugs:
+  sigsegv_crash_on_window_close:
+    symptom: App crashes with SIGSEGV in _NSWindowTransformAnimation dealloc
+    root_cause: SwiftUI WindowGroup creates/destroys NSWindow with animation lifecycle issues
+    fix: |
+      Custom MainAppWindow subclass with isReleasedWhenClosed=false.
+      WindowDelegate hides window (orderOut) instead of closing.
+      Removed WindowGroup from App body entirely.
+    files: [VoiceTranscriberApp.swift]
+
+  accessibility_permission_not_updating:
+    symptom: Granting permission in System Settings not reflected in app
+    root_cause: AXIsProcessTrusted() only checked once on appear
+    fix: Manual "Refresh Permissions" button. Onboarding polls every 5s.
+    note: Aggressive 2s polling was causing System Settings to lag — removed from settings view.
+    files: [AppSettingsView.swift, OnboardingView.swift]
+
+  hotkey_change_not_working:
+    symptom: Changing hotkey in settings had no effect
+    root_cause: startCapturingHotkey() only worked when CGEvent tap was running
+    fix: Added NSEvent local monitors as fallback for hotkey capture UI
+    files: [HotKeyManager.swift]
+
+  keychain_password_prompts:
+    symptom: macOS asks for password twice when opening settings
+    root_cause: kSecAttrAccessibleWhenUnlockedThisDeviceOnly triggers auth dialog
+    fix: Changed to kSecAttrAccessibleAfterFirstUnlock
+    files: [ConfigManager.swift]
+
+  build_error_config_binding:
+    symptom: "cannot assign to property: 'config' is a let constant"
+    root_cause: $appState.config.targetLanguage binding fails because config is let
+    fix: Used explicit Binding(get:set:) wrapper in MenuBarView
+    files: [MenuBarView.swift]
+
+  dmg_not_created:
+    symptom: Build succeeds but no DMG file produced
+    root_cause: set -euo pipefail kills script when sips icon generation fails
+    fix: Wrapped icon generation in subshell (...) || echo warning
+    files: [build.sh]
+
+  system_settings_lagging:
+    symptom: Privacy & Security settings become slow/laggy
+    root_cause: Stale app entry in Accessibility list (binary deleted but entry remains)
+    fix: User must remove old entry. Added clean uninstall instructions.
+    note: Also reduced polling frequency to prevent contributing to lag.
+
+  hardcoded_fn_text:
+    symptom: All UI showed "fn" regardless of configured hotkey
+    fix: Replaced all hardcoded "fn" with appState.hotkeyDescription
+    files: [HomeView.swift, MenuBarView.swift, MainWindowView.swift]
+
+  no_window_on_launch:
+    symptom: Only menu bar icon appears, no window opens
+    fix: Added showMainWindow() call in appDidFinishLaunching after onboarding
+    files: [VoiceTranscriberApp.swift]
+
+open_issues:
+  transcription_may_not_work:
+    symptom: User reported transcription stopped working in new build
+    likely_cause: API keys stored under old Keychain service name, or permissions not granted
+    workaround: Re-enter API keys in settings after clean install

@@ -1,0 +1,80 @@
+# Verbalize — Project Overview
+# Read this FIRST before touching any code. Points you to the right files.
+
+app_name: Verbalize
+display_name: Verbalize
+executable_name: VoiceTranscriber  # SPM target name (unchanged from original)
+bundle_id: com.verbalize.app
+version: 1.1.0
+min_macos: "13.0"
+
+description: |
+  Privacy-first macOS voice-to-text app. Records speech via hotkey,
+  transcribes with Whisper, cleans with Claude Haiku, optionally
+  translates, and injects text into the active field.
+
+tech_stack:
+  language: Swift 5.9
+  ui: SwiftUI + AppKit hybrid
+  build: Swift Package Manager
+  database: GRDB (SQLite)
+  apis:
+    - OpenAI Whisper (gpt-4o-mini-transcribe, whisper-1 fallback)
+    - Anthropic Claude Haiku 4.5
+
+# Entry point and key files — read these to understand the app
+key_files:
+  entry_point: VoiceTranscriber/App/VoiceTranscriberApp.swift
+  state_orchestrator: VoiceTranscriber/App/VoiceTranscriberApp.swift  # AppState class
+  build_script: build.sh
+  package: Package.swift
+  readme: README.md
+
+# Where things live — use this map instead of reading everything
+file_map:
+  App/:
+    VoiceTranscriberApp.swift: |
+      @main entry (VerbalizeApp), AppState orchestrator, MainAppWindow subclass,
+      WindowDelegate, AppDelegate. This is the brain of the app.
+  API/:
+    WhisperClient.swift: OpenAI Whisper API client (transcription)
+    ClaudeClient.swift: Claude Haiku API client (cleanup + translation)
+  Audio/:
+    AudioRecorder.swift: AVAudioEngine recording, 16kHz mono, temp file output
+    AudioLevelMonitor.swift: Smoothed audio levels for waveform UI
+  Database/:
+    TranscriptDatabase.swift: GRDB SQLite storage, auto-migrates VoiceTranscriber -> Verbalize dir
+  Hotkey/:
+    HotKeyManager.swift: CGEvent tap + NSEvent fallback for global hotkey
+  Models/:
+    Transcript.swift: Transcript data model (id, timestamp, original, cleaned, duration)
+  UI/:
+    MainWindowView.swift: Sidebar navigation + detail view container
+    HomeView.swift: Dashboard with stat cards (words, WPM, transcripts, time)
+    MenuBarView.swift: Menu bar dropdown with translation toggle + language picker
+    AppSettingsView.swift: Full settings (hotkey, translation, API keys, permissions, uninstall)
+    DictionaryView.swift: Custom word dictionary management
+    StyleView.swift: Per-context style tone selection
+    OnboardingView.swift: First-launch setup wizard (permissions + API keys)
+    RecordingWindow.swift: Floating waveform overlay during recording
+    SettingsView.swift: Legacy settings (not actively used)
+  Utils/:
+    ConfigManager.swift: All settings, Keychain API keys, dictionary, style profiles, translation config
+    TextInjection.swift: AX API / clipboard text injection into active field
+
+features:
+  - Push-to-talk recording via configurable hotkey
+  - Whisper transcription with custom dictionary hints
+  - Claude cleanup (filler removal, self-correction, formatting)
+  - Real-time translation (20 languages, toggle from menu bar)
+  - Context-aware style (detects active app, adjusts tone)
+  - Custom dictionary (names, technical terms)
+  - Style profiles per context (personal, work, email, other)
+  - WPM stats and transcript history
+  - Secure Keychain storage for API keys
+  - Menu bar app with main window
+
+known_issues:
+  - Cannot test builds on dev server (no Swift compiler)
+  - After rebuilding, user must remove/re-add in Accessibility settings
+  - Old Keychain entries (com.voicetranscriber.apikeys) may linger after rename

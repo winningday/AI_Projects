@@ -1,0 +1,55 @@
+# Verbalize — Architecture & Data Flow
+# Read this to understand how components connect without reading source code.
+
+window_management:
+  pattern: NSWindow subclass + WindowDelegate
+  details: |
+    MainAppWindow (isReleasedWhenClosed=false) hides on close instead of
+    deallocating. WindowDelegate.windowShouldClose returns false and calls
+    orderOut. This prevents the _NSWindowTransformAnimation SIGSEGV crash.
+  activation_policy: |
+    Starts as .regular (shows in dock). When all windows close, switches
+    to .accessory (menu bar only). Re-activates as .regular when window opens.
+
+recording_pipeline:
+  trigger: HotKeyManager detects hotkey down
+  flow:
+    1_context_capture: TextInjector reads surrounding text from active field
+    2_start_recording: AudioRecorder starts AVAudioEngine (16kHz mono Float32)
+    3_show_overlay: RecordingWindowController shows floating waveform
+    4_hotkey_release: HotKeyManager detects hotkey up
+    5_stop_recording: AudioRecorder stops, returns (url, duration)
+    6_transcribe: WhisperClient sends audio to OpenAI (with dictionary hints)
+    7_detect_style: AppState checks active app name -> StyleTone
+    8_cleanup: ClaudeClient cleans text (+ optional translation)
+    9_save: TranscriptDatabase stores in SQLite
+    10_inject: TextInjector pastes cleaned text into active field
+    11_stats: AppState recomputes totalWords and totalRecordingTime
+
+hotkey_system:
+  primary: CGEvent tap (requires Accessibility permission)
+  fallback: NSEvent local+global monitors (works without full AX permission)
+  capture_mode: |
+    startCapturingHotkey() installs temporary NSEvent monitors for settings UI.
+    After capture, restarts normal listening with new key.
+
+translation:
+  toggle: Menu bar dropdown + Settings page
+  storage: ConfigManager.translationEnabled + targetLanguage (UserDefaults)
+  implementation: |
+    ClaudeClient.buildSystemPrompt() adds TRANSLATION MODE section when enabled.
+    Claude auto-detects source language, translates to target after cleanup.
+  languages: 20 (en, es, fr, de, it, pt, zh, ja, ko, ar, ru, hi, nl, sv, pl, tr, vi, th, he, uk)
+
+data_storage:
+  transcripts: ~/Library/Application Support/Verbalize/transcripts.sqlite
+  preferences: UserDefaults (standard)
+  api_keys: macOS Keychain (service: com.verbalize.apikeys)
+  migration: Auto-moves VoiceTranscriber dir to Verbalize dir on first launch
+
+ui_structure:
+  menu_bar: MenuBarExtra (.window style) — always visible
+  main_window: MainAppWindow with NavigationSplitView sidebar
+  tabs: [Home, Dictionary, Style, Settings]
+  onboarding: Separate NSWindow for first-launch setup
+  recording: Floating NSPanel with waveform visualization
