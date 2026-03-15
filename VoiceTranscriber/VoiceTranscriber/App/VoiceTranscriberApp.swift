@@ -6,6 +6,7 @@ import Combine
 
 enum AppTab: String, CaseIterable, Identifiable {
     case home = "Home"
+    case stats = "Stats"
     case dictionary = "Dictionary"
     case style = "Style"
     case settings = "Settings"
@@ -15,6 +16,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .home: return "house"
+        case .stats: return "chart.bar"
         case .dictionary: return "character.book.closed"
         case .style: return "textformat"
         case .settings: return "gear"
@@ -68,10 +70,56 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Words per minute across all transcripts
+    /// Voice dictation WPM (words produced per minute of recording)
     var wordsPerMinute: Int {
-        guard totalRecordingSeconds > 30 else { return 0 }
+        guard totalRecordingSeconds > 5 else { return 0 }
         return Int(Double(totalWordsTranscribed) / (totalRecordingSeconds / 60.0))
+    }
+
+    /// Speed multiplier vs typing (e.g. 2.5x faster)
+    var speedMultiplier: Double {
+        guard config.typingSpeed > 0, wordsPerMinute > 0 else { return 0 }
+        return Double(wordsPerMinute) / Double(config.typingSpeed)
+    }
+
+    /// Minutes saved compared to typing the same words
+    var minutesSaved: Double {
+        guard config.typingSpeed > 0, totalWordsTranscribed > 0 else { return 0 }
+        let typingMinutes = Double(totalWordsTranscribed) / Double(config.typingSpeed)
+        let voiceMinutes = totalRecordingSeconds / 60.0
+        return max(0, typingMinutes - voiceMinutes)
+    }
+
+    /// Average words per transcript
+    var averageWordsPerTranscript: Int {
+        let count = database.transcripts.count
+        guard count > 0 else { return 0 }
+        return totalWordsTranscribed / count
+    }
+
+    /// Today's word count
+    var todayWordCount: Int {
+        database.transcripts
+            .filter { Calendar.current.isDateInToday($0.timestamp) }
+            .reduce(0) { $0 + $1.cleanedText.split(separator: " ").count }
+    }
+
+    /// Today's transcript count
+    var todayTranscriptCount: Int {
+        database.transcripts.filter { Calendar.current.isDateInToday($0.timestamp) }.count
+    }
+
+    /// Last 7 days of daily word counts (for chart)
+    var weeklyWordCounts: [(date: Date, words: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).reversed().map { daysAgo in
+            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
+            let words = database.transcripts
+                .filter { calendar.isDate($0.timestamp, inSameDayAs: date) }
+                .reduce(0) { $0 + $1.cleanedText.split(separator: " ").count }
+            return (date: date, words: words)
+        }
     }
 
     // MARK: - Hotkey Callbacks

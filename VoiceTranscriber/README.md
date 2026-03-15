@@ -15,6 +15,7 @@ A privacy-first macOS voice-to-text application with real-time translation. Reco
 - **Custom dictionary** — Learns names, technical terms, and brand words for better accuracy
 - **Style profiles** — Per-app tone settings (formal, casual, very casual, excited)
 - **Text injection** — Cleaned text is automatically typed into your active text field
+- **Productivity dashboard** — Voice WPM vs typing speed comparison, speed multiplier, time saved, weekly activity chart
 - **Transcript history** — Searchable local SQLite database of all past transcriptions with WPM stats
 - **Configurable hotkey** — Rebind to any key or key combination in Settings
 - **Smart formatting** — Auto-detects code, technical terms, numbered lists
@@ -129,7 +130,8 @@ VoiceTranscriber/
 │   │   └── Transcript.swift              # Transcript data model
 │   ├── UI/
 │   │   ├── MainWindowView.swift          # Main window with sidebar navigation
-│   │   ├── HomeView.swift                # Dashboard with stats (words, WPM, time)
+│   │   ├── HomeView.swift                # Quick stats row + transcript list
+│   │   ├── StatsView.swift              # Productivity dashboard (voice vs typing WPM)
 │   │   ├── MenuBarView.swift             # Menu bar with translation toggle
 │   │   ├── AppSettingsView.swift         # Full settings (hotkey, translation, API keys)
 │   │   ├── DictionaryView.swift          # Custom dictionary management

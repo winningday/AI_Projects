@@ -50,7 +50,8 @@ file_map:
     Transcript.swift: Transcript data model (id, timestamp, original, cleaned, duration)
   UI/:
     MainWindowView.swift: Sidebar navigation + detail view container
-    HomeView.swift: Dashboard with stat cards (words, WPM, transcripts, time)
+    HomeView.swift: Quick stats row + transcript list
+    StatsView.swift: Productivity dashboard (voice vs typing WPM, speed multiplier, weekly chart)
     MenuBarView.swift: Menu bar dropdown with translation toggle + language picker
     AppSettingsView.swift: Full settings (hotkey, translation, API keys, permissions, uninstall)
     DictionaryView.swift: Custom word dictionary management
@@ -72,6 +73,8 @@ features:
   - Style profiles per context (personal, work, email, other)
   - WPM stats and transcript history
   - Secure Keychain storage for API keys
+  - Productivity dashboard (voice WPM vs typing speed comparison, weekly chart)
+  - Configurable typing speed for accurate time-saved calculations
   - Menu bar app with main window
 
 known_issues:

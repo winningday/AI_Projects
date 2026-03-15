@@ -28,9 +28,9 @@ struct HomeView: View {
                         color: .purple
                     )
                     StatCard(
-                        title: "Time Saved",
-                        value: formatTimeSaved(appState.totalRecordingSeconds),
-                        icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                        title: "Speed",
+                        value: appState.speedMultiplier > 0 ? String(format: "%.1fx", appState.speedMultiplier) : "—",
+                        icon: "bolt.fill",
                         color: .orange
                     )
                 }
@@ -126,12 +126,10 @@ struct HomeView: View {
         return "\(count)"
     }
 
-    private func formatTimeSaved(_ seconds: Double) -> String {
-        // Estimate typing time saved: ~40 WPM typing vs speaking
-        let minutesSaved = seconds / 60.0 * 1.5 // rough multiplier
-        if minutesSaved < 1 { return "0m" }
-        if minutesSaved < 60 { return "\(Int(minutesSaved))m" }
-        return String(format: "%.1fh", minutesSaved / 60.0)
+    private func formatMinutes(_ minutes: Double) -> String {
+        if minutes < 1 { return "0m" }
+        if minutes < 60 { return "\(Int(minutes))m" }
+        return String(format: "%.1fh", minutes / 60.0)
     }
 }
 

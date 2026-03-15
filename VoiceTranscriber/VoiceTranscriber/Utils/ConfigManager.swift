@@ -120,6 +120,7 @@ final class ConfigManager: ObservableObject {
         static let styleProfiles = "styleProfiles"
         static let translationEnabled = "translationEnabled"
         static let targetLanguage = "targetLanguage"
+        static let typingSpeed = "typingSpeed"
     }
 
     // MARK: - Keychain Service
@@ -181,6 +182,11 @@ final class ConfigManager: ObservableObject {
 
     @Published var targetLanguage: String {
         didSet { defaults.set(targetLanguage, forKey: Keys.targetLanguage) }
+    }
+
+    /// User's estimated typing speed in WPM (used for productivity comparisons)
+    @Published var typingSpeed: Int {
+        didSet { defaults.set(typingSpeed, forKey: Keys.typingSpeed) }
     }
 
     static let supportedLanguages: [(code: String, name: String)] = [
@@ -258,6 +264,8 @@ final class ConfigManager: ObservableObject {
         self.autoAddToDictionary = defaults.object(forKey: Keys.autoAddToDictionary) as? Bool ?? true
         self.translationEnabled = defaults.bool(forKey: Keys.translationEnabled)
         self.targetLanguage = defaults.string(forKey: Keys.targetLanguage) ?? "en"
+        let savedTypingSpeed = defaults.integer(forKey: Keys.typingSpeed)
+        self.typingSpeed = savedTypingSpeed > 0 ? savedTypingSpeed : 40
 
         // Load dictionary
         if let data = defaults.data(forKey: Keys.dictionaryEntries),

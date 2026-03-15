@@ -50,6 +50,6 @@ data_storage:
 ui_structure:
   menu_bar: MenuBarExtra (.window style) — always visible
   main_window: MainAppWindow with NavigationSplitView sidebar
-  tabs: [Home, Dictionary, Style, Settings]
+  tabs: [Home, Stats, Dictionary, Style, Settings]
   onboarding: Separate NSWindow for first-launch setup
   recording: Floating NSPanel with waveform visualization

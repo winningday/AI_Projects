@@ -30,6 +30,28 @@ struct AppSettingsView: View {
                     Toggle("Haptic feedback", isOn: $config.useHapticFeedback)
                     Toggle("Sound effects", isOn: $config.playSoundEffects)
                     Toggle("Auto-inject text into active field", isOn: $config.autoInjectText)
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Your typing speed")
+                                .font(.system(size: 13))
+                            Spacer()
+                            HStack(spacing: 4) {
+                                TextField("", value: $config.typingSpeed, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 60)
+                                    .multilineTextAlignment(.trailing)
+                                Text("WPM")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        Text("Used to compare voice dictation speed against typing in the Stats dashboard. Average is 40 WPM.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 // Hotkey section
