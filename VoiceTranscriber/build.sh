@@ -51,113 +51,17 @@ mkdir -p "${MACOS}" "${RESOURCES}"
 # Copy executable (renamed to display name)
 cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
 
-# Generate app icon from icon.png using sips (built-in macOS tool)
-# This runs in a subshell so failures don't kill the whole build
-(
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    SOURCE_ICON="${SCRIPT_DIR}/icon.png"
-    ICON_DIR="${RESOURCES}/AppIcon.iconset"
+# Generate app icon using make-icon.sh
+# The --fix-corners flag handles source images with baked-in rounded corners
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_ICON="${SCRIPT_DIR}/icon.png"
 
-    if [ ! -f "${SOURCE_ICON}" ]; then
-        echo "==> Warning: icon.png not found at ${SOURCE_ICON}, skipping icon"
-        exit 0
-    fi
-
-    echo "==> Generating app icon from icon.png..."
-    mkdir -p "${ICON_DIR}"
-
-    # Make the icon full-bleed: extend the background to fill the entire 1024x1024
-    # canvas edge-to-edge. macOS applies its own squircle mask automatically.
-    # Without this, baked-in rounded corners create a white border artifact.
-    FULLBLEED_ICON="${ICON_DIR}/_fullbleed.png"
-    swift - "${SOURCE_ICON}" "${FULLBLEED_ICON}" << 'SWIFT_FULLBLEED'
-import AppKit
-
-let args = CommandLine.arguments
-guard args.count >= 3 else { exit(1) }
-
-guard let srcImage = NSImage(contentsOfFile: args[1]) else {
-    fputs("Error: cannot load source icon\n", stderr)
-    exit(1)
-}
-
-let size: CGFloat = 1024
-let rep = NSBitmapImageRep(
-    bitmapDataPlanes: nil,
-    pixelsWide: Int(size), pixelsHigh: Int(size),
-    bitsPerSample: 8, samplesPerPixel: 4,
-    hasAlpha: false, isPlanar: false,
-    colorSpaceName: .deviceRGB,
-    bytesPerRow: 0, bitsPerPixel: 0
-)!
-
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)!
-
-let rect = NSRect(x: 0, y: 0, width: size, height: size)
-
-// Sample the background color from the center-top area of the icon
-// (safely inside the rounded-rect region of the original icon)
-let sampleRep = NSBitmapImageRep(data: srcImage.tiffRepresentation!)!
-// Sample at ~50% x, ~90% y (top-center, well inside the dark background)
-let sx = sampleRep.pixelsWide / 2
-let sy = Int(Double(sampleRep.pixelsHigh) * 0.9)
-let bgColor = sampleRep.colorAt(x: sx, y: sy) ?? NSColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1.0)
-
-// Fill entire canvas with the sampled background color
-bgColor.setFill()
-rect.fill()
-
-// Draw the original icon on top — its transparent corners blend seamlessly
-srcImage.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
-
-NSGraphicsContext.restoreGraphicsState()
-
-guard let pngData = rep.representation(using: .png, properties: [:]) else {
-    fputs("Error: cannot create PNG\n", stderr)
-    exit(1)
-}
-try! pngData.write(to: URL(fileURLWithPath: args[2]))
-SWIFT_FULLBLEED
-
-    if [ ! -f "${FULLBLEED_ICON}" ]; then
-        echo "==> Warning: full-bleed step failed, falling back to raw icon"
-        FULLBLEED_ICON="${SOURCE_ICON}"
-    fi
-
-    # Source is the full-bleed 1024x1024 square PNG (no transparency)
-    TEMP="${ICON_DIR}/_source.png"
-    cp "${FULLBLEED_ICON}" "${TEMP}"
-
-    # Generate all required iconset sizes
-    for size in 16 32 64 128 256 512 1024; do
-        sips -z "${size}" "${size}" "${TEMP}" --out "${ICON_DIR}/_s${size}.png" >/dev/null 2>&1
-    done
-    rm -f "${TEMP}"
-
-    # Create iconset with Apple's required naming convention
-    cp "${ICON_DIR}/_s16.png"   "${ICON_DIR}/icon_16x16.png"
-    cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_16x16@2x.png"
-    cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_32x32.png"
-    cp "${ICON_DIR}/_s64.png"   "${ICON_DIR}/icon_32x32@2x.png"
-    cp "${ICON_DIR}/_s128.png"  "${ICON_DIR}/icon_128x128.png"
-    cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_128x128@2x.png"
-    cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_256x256.png"
-    cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_256x256@2x.png"
-    cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_512x512.png"
-    cp "${ICON_DIR}/_s1024.png" "${ICON_DIR}/icon_512x512@2x.png"
-
-    # Clean up temp sized files
-    rm -f "${ICON_DIR}"/_s*.png "${ICON_DIR}/_fullbleed.png"
-
-    # Convert iconset to icns
-    if iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null; then
-        echo "==> App icon generated successfully"
-    else
-        echo "==> Warning: iconutil failed, app will use default icon"
-    fi
-    rm -rf "${ICON_DIR}"
-) || echo "==> Warning: Icon generation failed, continuing without custom icon..."
+if [ -f "${SOURCE_ICON}" ]; then
+    "${SCRIPT_DIR}/make-icon.sh" --fix-corners "${SOURCE_ICON}" "${RESOURCES}/AppIcon.icns" \
+        || echo "==> Warning: Icon generation failed, continuing without custom icon..."
+else
+    echo "==> Warning: icon.png not found, skipping icon generation"
+fi
 
 # Create Info.plist
 cat > "${CONTENTS}/Info.plist" << PLIST

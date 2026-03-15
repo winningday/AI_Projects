@@ -17,6 +17,15 @@
 | `VoiceTranscriber/` | **Verbalize** — macOS voice-to-text app with translation | Active |
 | `rotating-gif-maker/` | Logo rotation GIF generator | Complete |
 
+## Skills
+
+| Command | Description |
+|---------|-------------|
+| `/design-icon` | Interactive icon design workflow. Asks questions one at a time about your app, audience, and style, then generates 3 optimized prompts for AI image generators (Gemini, DALL-E, Midjourney, Recraft, etc.) with exact macOS icon specs baked in. Supports iteration until you get the perfect logo. |
+| `/make-icon` | Convert a source PNG into a properly formatted macOS `.icns` file. Handles rounded corner fixes (`--fix-corners`), safe zone padding (`--padding`), and all required iconset sizes. Use after `/design-icon` to finalize. |
+
+> **Global install:** Copy `.claude/skills/design-icon/` and `.claude/skills/make-icon/` to `~/.claude/skills/` to use across all projects.
+
 ## Quick Reference
 
 - Primary branch pattern: `claude/<feature>-<session-id>`
