@@ -51,103 +51,57 @@ mkdir -p "${MACOS}" "${RESOURCES}"
 # Copy executable (renamed to display name)
 cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
 
-# Generate app icon using sips (built-in macOS tool)
-generate_app_icon() {
-    local ICON_DIR="${RESOURCES}/AppIcon.iconset"
-    local SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    local SOURCE_ICON="${SCRIPT_DIR}/icon.png"
-    mkdir -p "${ICON_DIR}"
+# Generate app icon from icon.png using sips (built-in macOS tool)
+# This runs in a subshell so failures don't kill the whole build
+(
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    SOURCE_ICON="${SCRIPT_DIR}/icon.png"
+    ICON_DIR="${RESOURCES}/AppIcon.iconset"
 
     if [ ! -f "${SOURCE_ICON}" ]; then
-        echo "==> Warning: icon.png not found, skipping icon generation"
-        return
+        echo "==> Warning: icon.png not found at ${SOURCE_ICON}, skipping icon"
+        exit 0
     fi
 
     echo "==> Generating app icon from icon.png..."
+    mkdir -p "${ICON_DIR}"
 
-    # The source icon.png is 1380x752 (banner with icon in center)
-    # Extract the center square (the app icon portion) using sips + python
-    local TEMP_SQUARE="${ICON_DIR}/_temp_square.png"
+    # The source is a 1380x752 banner — crop to center square using sips
+    TEMP="${ICON_DIR}/_source.png"
+    cp "${SOURCE_ICON}" "${TEMP}"
 
-    # Crop center square from the banner image using python
-    python3 - "${SOURCE_ICON}" "${TEMP_SQUARE}" << 'PYEOF'
-import sys, struct, zlib
+    # Crop to square (uses height as size, centered horizontally)
+    sips -c 752 752 "${TEMP}" --out "${TEMP}" >/dev/null 2>&1
 
-src_path = sys.argv[1]
-dst_path = sys.argv[2]
+    # Generate all required iconset sizes
+    for size in 16 32 64 128 256 512 1024; do
+        sips -z "${size}" "${size}" "${TEMP}" --out "${ICON_DIR}/_s${size}.png" >/dev/null 2>&1
+    done
+    rm -f "${TEMP}"
 
-with open(src_path, 'rb') as f:
-    data = f.read()
+    # Create iconset with Apple's required naming convention
+    cp "${ICON_DIR}/_s16.png"   "${ICON_DIR}/icon_16x16.png"
+    cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_16x16@2x.png"
+    cp "${ICON_DIR}/_s32.png"   "${ICON_DIR}/icon_32x32.png"
+    cp "${ICON_DIR}/_s64.png"   "${ICON_DIR}/icon_32x32@2x.png"
+    cp "${ICON_DIR}/_s128.png"  "${ICON_DIR}/icon_128x128.png"
+    cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_128x128@2x.png"
+    cp "${ICON_DIR}/_s256.png"  "${ICON_DIR}/icon_256x256.png"
+    cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_256x256@2x.png"
+    cp "${ICON_DIR}/_s512.png"  "${ICON_DIR}/icon_512x512.png"
+    cp "${ICON_DIR}/_s1024.png" "${ICON_DIR}/icon_512x512@2x.png"
 
-# Parse PNG to get raw pixels
-# Read IHDR
-w, h = struct.unpack('>II', data[16:24])
-print(f"  Source: {w}x{h}")
-
-# The icon is centered in the banner image
-# Crop a square from center, using height as the square size (with some padding)
-sq = min(w, h)
-# Add some top/bottom margin to focus on the icon
-margin_y = int(sq * 0.03)
-margin_x = int((w - sq) / 2)
-
-# For the crop, we'll use sips on macOS, so just write coords
-# Output the crop coordinates for sips
-crop_size = h - (margin_y * 2)
-print(f"  Cropping to {crop_size}x{crop_size} square from center")
-
-# Write crop info for the shell script to use
-with open(dst_path + '.crop', 'w') as f:
-    f.write(f"{crop_size} {margin_x + (w - crop_size)//2 - margin_x} {margin_y}")
-PYEOF
-
-    # Read crop params and use sips (macOS built-in) to crop and resize
-    if [ -f "${TEMP_SQUARE}.crop" ]; then
-        read CROP_SIZE CROP_X CROP_Y < "${TEMP_SQUARE}.crop"
-        rm "${TEMP_SQUARE}.crop"
-
-        # Copy source and crop with sips
-        cp "${SOURCE_ICON}" "${TEMP_SQUARE}"
-        # Crop to square from center: first pad, then cropToHeightWidth
-        sips -c "${CROP_SIZE}" "${CROP_SIZE}" "${TEMP_SQUARE}" --out "${TEMP_SQUARE}" 2>/dev/null
-
-        # Generate all required iconset sizes
-        for size in 16 32 64 128 256 512 1024; do
-            sips -z "${size}" "${size}" "${TEMP_SQUARE}" --out "${ICON_DIR}/icon_${size}.png" 2>/dev/null
-        done
-
-        # Create iconset naming convention
-        cp "${ICON_DIR}/icon_16.png"   "${ICON_DIR}/icon_16x16.png"
-        cp "${ICON_DIR}/icon_32.png"   "${ICON_DIR}/icon_16x16@2x.png"
-        cp "${ICON_DIR}/icon_32.png"   "${ICON_DIR}/icon_32x32.png"
-        cp "${ICON_DIR}/icon_64.png"   "${ICON_DIR}/icon_32x32@2x.png"
-        cp "${ICON_DIR}/icon_128.png"  "${ICON_DIR}/icon_128x128.png"
-        cp "${ICON_DIR}/icon_256.png"  "${ICON_DIR}/icon_128x128@2x.png"
-        cp "${ICON_DIR}/icon_256.png"  "${ICON_DIR}/icon_256x256.png"
-        cp "${ICON_DIR}/icon_512.png"  "${ICON_DIR}/icon_256x256@2x.png"
-        cp "${ICON_DIR}/icon_512.png"  "${ICON_DIR}/icon_512x512.png"
-        cp "${ICON_DIR}/icon_1024.png" "${ICON_DIR}/icon_512x512@2x.png"
-
-        # Clean up temp files
-        rm -f "${TEMP_SQUARE}" "${ICON_DIR}"/icon_[0-9]*.png
-    fi
+    # Clean up temp sized files
+    rm -f "${ICON_DIR}"/_s*.png
 
     # Convert iconset to icns
-    if command -v iconutil &>/dev/null; then
-        iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null && {
-            echo "==> App icon generated"
-            rm -rf "${ICON_DIR}"
-        } || {
-            echo "==> Warning: iconutil failed, app will use default icon"
-            rm -rf "${ICON_DIR}"
-        }
+    if iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null; then
+        echo "==> App icon generated successfully"
     else
-        echo "==> Warning: iconutil not found, app will use default icon"
-        rm -rf "${ICON_DIR}"
+        echo "==> Warning: iconutil failed, app will use default icon"
     fi
-}
-
-generate_app_icon
+    rm -rf "${ICON_DIR}"
+) || echo "==> Warning: Icon generation failed, continuing without custom icon..."
 
 # Create Info.plist
 cat > "${CONTENTS}/Info.plist" << PLIST
