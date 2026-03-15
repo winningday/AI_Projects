@@ -17,6 +17,12 @@
 | `VoiceTranscriber/` | **Verbalize** — macOS voice-to-text app with translation | Active |
 | `rotating-gif-maker/` | Logo rotation GIF generator | Complete |
 
+## Skills
+
+| Command | Description |
+|---------|-------------|
+| `/make-icon` | Generate a properly formatted macOS `.icns` app icon from a source PNG. Handles rounded corner fixes, safe zone padding, and all required iconset sizes. |
+
 ## Quick Reference
 
 - Primary branch pattern: `claude/<feature>-<session-id>`
