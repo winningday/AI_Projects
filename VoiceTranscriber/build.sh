@@ -17,7 +17,7 @@ PRODUCT_NAME="VoiceTranscriber"
 DISPLAY_NAME="Verbalize"
 BUNDLE_ID="com.verbalize.app"
 APP_NAME="${DISPLAY_NAME}.app"
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 echo "==> Building Verbalize ($BUILD_TYPE)..."
 
@@ -182,7 +182,7 @@ cat > "${CONTENTS}/Info.plist" << PLIST
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>

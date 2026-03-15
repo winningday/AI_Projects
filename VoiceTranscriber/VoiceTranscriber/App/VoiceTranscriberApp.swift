@@ -56,6 +56,21 @@ final class AppState: ObservableObject {
         setupHotkeyCallbacks()
         computeTotalWords()
         computeTotalRecordingTime()
+
+        // Forward nested ConfigManager changes so SwiftUI views update properly.
+        // Without this, changes to config.translationEnabled etc. don't trigger
+        // view refreshes in views that observe AppState (like MenuBarView).
+        config.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        // Listen for dock icon clicks to reopen main window
+        NotificationCenter.default.addObserver(forName: .showMainWindow, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.showMainWindow()
+            }
+        }
     }
 
     private func computeTotalWords() {
@@ -327,6 +342,7 @@ final class AppState: ObservableObject {
     }
 
     func showOnboardingWindow() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "onboarding" }) {
             window.makeKeyAndOrderFront(nil)
@@ -458,13 +474,20 @@ struct VerbalizeApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Start as accessory (menu bar only) — window opens from menu bar
-        NSApp.setActivationPolicy(.accessory)
+        // Start as regular app so the window is cmd-tab-able on launch.
+        // We switch to accessory mode only when all windows are closed.
+        NSApp.setActivationPolicy(.regular)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // Menu-bar-first app — dock icon clicks should not open windows.
-        // Users open the main window from the menu bar "Open Verbalize" button.
-        return false
+        // When dock icon is clicked and no windows visible, show main window
+        if !flag {
+            NotificationCenter.default.post(name: .showMainWindow, object: nil)
+        }
+        return true
     }
+}
+
+extension Notification.Name {
+    static let showMainWindow = Notification.Name("showMainWindow")
 }

@@ -20,13 +20,19 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                Image(systemName: "mic.badge.plus")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                if let appIcon = NSImage(named: NSImage.applicationIconName) {
+                    Image(nsImage: appIcon)
+                        .resizable()
+                        .frame(width: 64, height: 64)
+                } else {
+                    Image(systemName: "mic.badge.plus")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.linearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                }
 
                 Text("Welcome to Verbalize")
                     .font(.system(size: 22, weight: .bold))
@@ -197,14 +203,14 @@ struct OnboardingView: View {
 
             if !openAIKey.isEmpty && !claudeKey.isEmpty {
                 Button(action: saveAPIKeys) {
-                    Label("Save Keys to Keychain", systemImage: "lock.shield")
+                    Label("Save Keys", systemImage: "checkmark.circle")
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top, 8)
             }
 
             if config.hasAPIKeys {
-                Label("Keys saved securely", systemImage: "checkmark.seal.fill")
+                Label("Keys saved", systemImage: "checkmark.seal.fill")
                     .foregroundColor(.green)
                     .font(.subheadline)
             }
@@ -229,10 +235,9 @@ struct OnboardingView: View {
     }
 
     private func openAccessibilitySettings() {
-        // Prompt accessibility dialog
-        let _ = hotkeyManager.checkAccessibilityPermission()
-
-        // Also open the pane directly
+        // Open System Settings directly to the Accessibility pane.
+        // Don't call checkAccessibilityPermission() — it triggers a redundant
+        // system popup that stays behind System Settings, confusing the user.
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }

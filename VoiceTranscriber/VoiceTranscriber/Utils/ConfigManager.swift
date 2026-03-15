@@ -1,5 +1,4 @@
 import Foundation
-import Security
 import ServiceManagement
 
 /// Style profile for different message contexts.
@@ -123,9 +122,12 @@ final class ConfigManager: ObservableObject {
         static let typingSpeed = "typingSpeed"
     }
 
-    // MARK: - Keychain Service
+    // MARK: - API Key Storage Keys
 
-    private let keychainService = "com.verbalize.apikeys"
+    private enum APIKeys {
+        static let openAI = "stored_openai_api_key"
+        static let claude = "stored_claude_api_key"
+    }
 
     // MARK: - Published Properties
 
@@ -327,27 +329,35 @@ final class ConfigManager: ObservableObject {
         }
     }
 
-    // MARK: - API Key Management (Keychain)
+    // MARK: - API Key Management (UserDefaults — no Keychain password prompts)
 
     var openAIAPIKey: String? {
-        get { readKeychain(account: "openai_api_key") ?? ProcessInfo.processInfo.environment["OPENAI_API_KEY"] }
+        get {
+            let stored = defaults.string(forKey: APIKeys.openAI)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["OPENAI_API_KEY"]
+        }
         set {
-            if let value = newValue {
-                saveKeychain(account: "openai_api_key", value: value)
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.openAI)
             } else {
-                deleteKeychain(account: "openai_api_key")
+                defaults.removeObject(forKey: APIKeys.openAI)
             }
             objectWillChange.send()
         }
     }
 
     var claudeAPIKey: String? {
-        get { readKeychain(account: "claude_api_key") ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] }
+        get {
+            let stored = defaults.string(forKey: APIKeys.claude)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"]
+        }
         set {
-            if let value = newValue {
-                saveKeychain(account: "claude_api_key", value: value)
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.claude)
             } else {
-                deleteKeychain(account: "claude_api_key")
+                defaults.removeObject(forKey: APIKeys.claude)
             }
             objectWillChange.send()
         }
@@ -358,41 +368,14 @@ final class ConfigManager: ObservableObject {
         !(openAIAPIKey?.isEmpty ?? true) && !(claudeAPIKey?.isEmpty ?? true)
     }
 
-    // MARK: - Keychain Helpers
+    // MARK: - Simple Obfuscation (base64 encoding to avoid plain-text in plist)
 
-    private func saveKeychain(account: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
-        deleteKeychain(account: account)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        SecItemAdd(query as CFDictionary, nil)
+    private func obfuscate(_ value: String) -> String {
+        Data(value.utf8).base64EncodedString()
     }
 
-    private func readKeychain(account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
+    private func deobfuscate(_ value: String) -> String? {
+        guard let data = Data(base64Encoded: value) else { return nil }
         return String(data: data, encoding: .utf8)
-    }
-
-    private func deleteKeychain(account: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(query as CFDictionary)
     }
 }

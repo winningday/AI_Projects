@@ -10,17 +10,11 @@ struct MainWindowView: View {
             VStack(spacing: 0) {
                 // App logo/title
                 HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.linearGradient(
-                                colors: [Color(red: 0.2, green: 0.15, blue: 0.55), Color(red: 0.12, green: 0.08, blue: 0.47)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
+                    if let appIcon = NSImage(named: NSImage.applicationIconName) {
+                        Image(nsImage: appIcon)
+                            .resizable()
                             .frame(width: 30, height: 30)
-                        Image(systemName: "waveform")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
                     }
                     Text("Verbalize")
                         .font(.system(size: 14, weight: .semibold))

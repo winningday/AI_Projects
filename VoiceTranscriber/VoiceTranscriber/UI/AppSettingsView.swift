@@ -214,7 +214,7 @@ struct AppSettingsView: View {
                         .buttonStyle(.borderedProminent)
 
                         if config.hasAPIKeys {
-                            Label("Saved in Keychain", systemImage: "lock.shield.fill")
+                            Label("Keys saved", systemImage: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
@@ -286,15 +286,12 @@ struct AppSettingsView: View {
                 // About section
                 SettingsSection(title: "About", icon: "info.circle") {
                     LabeledContent("Version") {
-                        Text("1.1.0")
+                        Text("1.2.0")
                             .foregroundColor(.secondary)
                     }
-                    LabeledContent("Whisper Model") {
-                        Text("gpt-4o-mini-transcribe")
-                            .foregroundColor(.secondary)
-                    }
-                    LabeledContent("Cleanup Model") {
-                        Text("Claude Haiku 4.5")
+                    LabeledContent("") {
+                        Text("Verbalize — Voice-to-text with translation")
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -310,7 +307,7 @@ struct AppSettingsView: View {
         .alert("API Keys Saved", isPresented: $showSavedAlert) {
             Button("OK") {}
         } message: {
-            Text("Your API keys have been saved securely in the macOS Keychain.")
+            Text("Your API keys have been saved.")
         }
         .alert("Delete All History?", isPresented: $showDeleteConfirm) {
             Button("Cancel", role: .cancel) {}

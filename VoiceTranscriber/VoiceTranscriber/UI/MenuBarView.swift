@@ -182,28 +182,26 @@ struct MenuBarView: View {
                     )
                 }
 
-                // Language picker (shown when translation is on)
-                if appState.config.translationEnabled {
-                    HStack(spacing: 6) {
-                        Text("Output:")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 20)
+                // Language picker (always visible so user knows the target)
+                HStack(spacing: 6) {
+                    Text(appState.config.translationEnabled ? "Translating to:" : "Language:")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 20)
 
-                        Picker("", selection: Binding(
-                            get: { appState.config.targetLanguage },
-                            set: { appState.config.targetLanguage = $0 }
-                        )) {
-                            ForEach(ConfigManager.supportedLanguages, id: \.code) { lang in
-                                Text(lang.name).tag(lang.code)
-                            }
+                    Picker("", selection: Binding(
+                        get: { appState.config.targetLanguage },
+                        set: { appState.config.targetLanguage = $0 }
+                    )) {
+                        ForEach(ConfigManager.supportedLanguages, id: \.code) { lang in
+                            Text(lang.name).tag(lang.code)
                         }
-                        .labelsHidden()
-                        .controlSize(.small)
-                        .frame(maxWidth: 140)
-
-                        Spacer()
                     }
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(maxWidth: 140)
+
+                    Spacer()
                 }
             }
             .padding(.horizontal, 14)
