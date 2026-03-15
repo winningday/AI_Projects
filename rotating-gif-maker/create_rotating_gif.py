@@ -116,11 +116,41 @@ def extract_face(img: Image.Image) -> Image.Image | None:
 # Background removal (requires `rembg`; graceful fallback if not installed)
 # ---------------------------------------------------------------------------
 
+def clean_alpha(img: Image.Image, threshold: int = 200) -> Image.Image:
+    """
+    Hard-binarize the alpha channel: any pixel below *threshold* becomes fully
+    transparent; at or above becomes fully opaque.
+
+    This eliminates the semi-transparent 'halo' that rembg leaves around
+    glowing / bright-edged logos. Without this, GIF's binary transparency
+    snaps those ~50-150 alpha halo pixels to opaque, producing an irregular
+    blob border instead of a clean edge.
+    """
+    import numpy as np
+    img = img.convert("RGBA")
+    r, g, b, a = img.split()
+    a_arr = np.array(a)
+    a_arr = np.where(a_arr >= threshold, 255, 0).astype(np.uint8)
+    img.putalpha(Image.fromarray(a_arr))
+    return img
+
+
 def remove_background(img: Image.Image) -> Image.Image:
+    import numpy as np
+    # If the image already has meaningful transparency, skip rembg —
+    # re-running segmentation on a pre-masked PNG degrades quality and
+    # can introduce halo artifacts on glowing / bright-edged logos.
+    if img.mode == "RGBA":
+        a_arr = np.array(img.split()[3])
+        if (a_arr < 255).sum() > 100:
+            print("  Image already has transparency — skipping rembg.")
+            return clean_alpha(img)
+
     try:
         from rembg import remove
         print("  Removing background with rembg…")
-        return remove(img)
+        result = remove(img.convert("RGB"))
+        return clean_alpha(result)
     except ImportError:
         print("  [warn] rembg not installed — skipping background removal.")
         print("         Run: pip install rembg  to enable this feature.")
@@ -397,6 +427,15 @@ def main() -> None:
         # ---- Standard pipeline ---------------------------------------------
         if args.remove_bg:
             img = remove_background(img)
+        elif img.mode == "RGBA":
+            # Logo PNG with existing transparency: binarize alpha to remove
+            # any soft-edge halo (glow effects, anti-aliasing residue) that
+            # would bleed through as opaque pixels in the GIF.
+            import numpy as np
+            a_arr = np.array(img.split()[3])
+            if (a_arr < 255).sum() > 100:
+                print("  Cleaning logo alpha (binarizing soft edges)…")
+                img = clean_alpha(img)
 
         if args.crop:
             print(f"  Cropping to centre {args.crop[0]}×{args.crop[1]}…")
