@@ -66,20 +66,17 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
     echo "==> Generating app icon from icon.png..."
     mkdir -p "${ICON_DIR}"
 
-    # Apply macOS-standard continuous rounded-rect (squircle) mask with anti-aliased edges
-    # This produces clean, polished icon edges at all sizes
-    MASKED_ICON="${ICON_DIR}/_masked.png"
-    swift - "${SOURCE_ICON}" "${MASKED_ICON}" << 'SWIFT_MASK'
+    # Make the icon full-bleed: extend the background to fill the entire 1024x1024
+    # canvas edge-to-edge. macOS applies its own squircle mask automatically.
+    # Without this, baked-in rounded corners create a white border artifact.
+    FULLBLEED_ICON="${ICON_DIR}/_fullbleed.png"
+    swift - "${SOURCE_ICON}" "${FULLBLEED_ICON}" << 'SWIFT_FULLBLEED'
 import AppKit
-import CoreGraphics
 
 let args = CommandLine.arguments
 guard args.count >= 3 else { exit(1) }
 
-let srcPath = args[1]
-let dstPath = args[2]
-
-guard let srcImage = NSImage(contentsOfFile: srcPath) else {
+guard let srcImage = NSImage(contentsOfFile: args[1]) else {
     fputs("Error: cannot load source icon\n", stderr)
     exit(1)
 }
@@ -89,45 +86,48 @@ let rep = NSBitmapImageRep(
     bitmapDataPlanes: nil,
     pixelsWide: Int(size), pixelsHigh: Int(size),
     bitsPerSample: 8, samplesPerPixel: 4,
-    hasAlpha: true, isPlanar: false,
+    hasAlpha: false, isPlanar: false,
     colorSpaceName: .deviceRGB,
     bytesPerRow: 0, bitsPerPixel: 0
 )!
 
 NSGraphicsContext.saveGraphicsState()
-let ctx = NSGraphicsContext(bitmapImageRep: rep)!
-NSGraphicsContext.current = ctx
+NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)!
 
-// macOS icon corner radius is ~22.37% of the icon size (continuous curve)
-let cornerRadius = size * 0.2237
 let rect = NSRect(x: 0, y: 0, width: size, height: size)
 
-// Use NSBezierPath with continuous corners (macOS squircle)
-let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-path.addClip()
+// Sample the background color from the center-top area of the icon
+// (safely inside the rounded-rect region of the original icon)
+let sampleRep = NSBitmapImageRep(data: srcImage.tiffRepresentation!)!
+// Sample at ~50% x, ~90% y (top-center, well inside the dark background)
+let sx = sampleRep.pixelsWide / 2
+let sy = Int(Double(sampleRep.pixelsHigh) * 0.9)
+let bgColor = sampleRep.colorAt(x: sx, y: sy) ?? NSColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 1.0)
 
-// Draw the source icon
+// Fill entire canvas with the sampled background color
+bgColor.setFill()
+rect.fill()
+
+// Draw the original icon on top — its transparent corners blend seamlessly
 srcImage.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
 NSGraphicsContext.restoreGraphicsState()
 
-// Save as PNG
-guard let pngData = rep.representation(using: .png, properties: [.interlaced: false]) else {
+guard let pngData = rep.representation(using: .png, properties: [:]) else {
     fputs("Error: cannot create PNG\n", stderr)
     exit(1)
 }
-let url = URL(fileURLWithPath: dstPath)
-try! pngData.write(to: url)
-SWIFT_MASK
+try! pngData.write(to: URL(fileURLWithPath: args[2]))
+SWIFT_FULLBLEED
 
-    if [ ! -f "${MASKED_ICON}" ]; then
-        echo "==> Warning: mask step failed, falling back to raw icon"
-        MASKED_ICON="${SOURCE_ICON}"
+    if [ ! -f "${FULLBLEED_ICON}" ]; then
+        echo "==> Warning: full-bleed step failed, falling back to raw icon"
+        FULLBLEED_ICON="${SOURCE_ICON}"
     fi
 
-    # Source is the masked 1024x1024 square PNG
+    # Source is the full-bleed 1024x1024 square PNG (no transparency)
     TEMP="${ICON_DIR}/_source.png"
-    cp "${MASKED_ICON}" "${TEMP}"
+    cp "${FULLBLEED_ICON}" "${TEMP}"
 
     # Generate all required iconset sizes
     for size in 16 32 64 128 256 512 1024; do
@@ -148,7 +148,7 @@ SWIFT_MASK
     cp "${ICON_DIR}/_s1024.png" "${ICON_DIR}/icon_512x512@2x.png"
 
     # Clean up temp sized files
-    rm -f "${ICON_DIR}"/_s*.png "${ICON_DIR}/_masked.png"
+    rm -f "${ICON_DIR}"/_s*.png "${ICON_DIR}/_fullbleed.png"
 
     # Convert iconset to icns
     if iconutil -c icns "${ICON_DIR}" -o "${RESOURCES}/AppIcon.icns" 2>/dev/null; then
