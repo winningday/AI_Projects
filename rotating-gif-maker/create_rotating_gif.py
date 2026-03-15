@@ -52,13 +52,19 @@ def detect_face(img: Image.Image):
 def extract_face(img: Image.Image) -> Image.Image | None:
     """
     Auto-detects a face, removes the background, and isolates just the head
-    (face + hair + neck) — excluding arms, hands, other people, etc.
+    (face + hair) — excluding neck, arms, hands, and other people.
 
     Strategy (two masks, intersected):
       1. rembg on the full image → removes the actual BACKGROUND (walls, etc.)
       2. Elliptical head mask from face bbox → removes any FOREGROUND body parts
-         (arms/fingers) that rembg kept but are outside the head silhouette.
-      3. min(rembg_alpha, ellipse) = clean head, no fingers, no background.
+         (neck, arms, fingers) outside the head silhouette.
+      3. min(rembg_alpha, ellipse) = clean head, no neck, no background.
+
+    Ellipse geometry (no neck):
+      - Center shifted UP by 0.15*fh so the bottom tangent lands at the chin
+      - ell_b = 0.65*fh → bottom = cy_adj + 0.65*fh = fy + fh  (chin)
+                         → top    = cy_adj - 0.65*fh = fy - 0.30*fh (hair)
+      The ellipse rounds off organically at the chin — no hard neck cut.
 
     No alpha gradients — GIF only supports binary transparency.
     """
@@ -86,29 +92,32 @@ def extract_face(img: Image.Image) -> Image.Image | None:
 
     rembg_alpha = np.array(rgba.split()[3])
 
-    # --- Elliptical head mask ------------------------------------------
-    # Shaped to match a head: wide enough for ears/hair, tall for hair + neck.
-    # The intersection with rembg clips arms/fingers that extend beyond
-    # the head silhouette while keeping the face, hair, and neck.
-    ell_a = int(fw * 0.58)    # horizontal semi-axis (ears + hair sides)
-    ell_b = int(fh * 0.82)    # vertical semi-axis  (hair top + neck bottom)
+    # --- Elliptical head mask (chin-level bottom, no neck) -------------
+    # Shift center up so the ellipse bottom lands just below the chin.
+    #   cy_adj + ell_b = fy + 0.35*fh + 0.70*fh = fy + 1.05*fh (5% below chin)
+    #   cy_adj - ell_b = fy + 0.35*fh - 0.70*fh = fy - 0.35*fh (above hair)
+    cy_adj = cy - int(fh * 0.15)
+    ell_a  = int(fw * 0.65)   # horizontal semi-axis — wide enough for ears
+    ell_b  = int(fh * 0.70)   # vertical semi-axis   — just clears chin, clips neck
     ellipse_mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.ellipse(ellipse_mask, center=(cx, cy),
+    cv2.ellipse(ellipse_mask, center=(cx, cy_adj),
                 axes=(ell_a, ell_b), angle=0,
                 startAngle=0, endAngle=360,
                 color=255, thickness=-1)
-    print(f"  Head ellipse: center=({cx},{cy}) axes=({ell_a},{ell_b})")
+    print(f"  Head ellipse: center=({cx},{cy_adj}) axes=({ell_a},{ell_b})")
 
-    # --- Intersect: rembg handles bg, ellipse handles stray body parts --
+    # --- Intersect: rembg handles bg, ellipse clips neck/arms ----------
     combined_alpha = np.minimum(rembg_alpha, ellipse_mask)
     result = rgba.copy()
     result.putalpha(Image.fromarray(combined_alpha))
 
-    # --- Place on square canvas centered on face -----------------------
-    half_canvas = int(fh * 0.85)
+    # --- Place on square canvas centered on adjusted face center -------
+    # half_canvas=0.95*fh gives the chin comfortable breathing room inside
+    # the circular mask (chin sits at ~74% of the radius, not at the edge).
+    half_canvas = int(fh * 0.95)
     canvas_size = half_canvas * 2
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    canvas.paste(result, (half_canvas - cx, half_canvas - cy))
+    canvas.paste(result, (half_canvas - cx, half_canvas - cy_adj))
     return canvas
 
 
