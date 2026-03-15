@@ -93,12 +93,12 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     rembg_alpha = np.array(rgba.split()[3])
 
     # --- Elliptical head mask (chin-level bottom, no neck) -------------
-    # Shift center up so the ellipse bottom lands naturally at the chin.
-    #   cy_adj + ell_b = fy + 0.35*fh + 0.65*fh = fy + fh  ✓ (chin)
-    #   cy_adj - ell_b = fy + 0.35*fh - 0.65*fh = fy - 0.30*fh (hair top)
+    # Shift center up so the ellipse bottom lands just below the chin.
+    #   cy_adj + ell_b = fy + 0.35*fh + 0.70*fh = fy + 1.05*fh (5% below chin)
+    #   cy_adj - ell_b = fy + 0.35*fh - 0.70*fh = fy - 0.35*fh (above hair)
     cy_adj = cy - int(fh * 0.15)
     ell_a  = int(fw * 0.65)   # horizontal semi-axis — wide enough for ears
-    ell_b  = int(fh * 0.65)   # vertical semi-axis   — top=hair, bottom=chin
+    ell_b  = int(fh * 0.70)   # vertical semi-axis   — just clears chin, clips neck
     ellipse_mask = np.zeros((h, w), dtype=np.uint8)
     cv2.ellipse(ellipse_mask, center=(cx, cy_adj),
                 axes=(ell_a, ell_b), angle=0,
@@ -112,8 +112,9 @@ def extract_face(img: Image.Image) -> Image.Image | None:
     result.putalpha(Image.fromarray(combined_alpha))
 
     # --- Place on square canvas centered on adjusted face center -------
-    # Smaller canvas (0.75*fh half-side) fills the circle with more face.
-    half_canvas = int(fh * 0.75)
+    # half_canvas=0.95*fh gives the chin comfortable breathing room inside
+    # the circular mask (chin sits at ~74% of the radius, not at the edge).
+    half_canvas = int(fh * 0.95)
     canvas_size = half_canvas * 2
     canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     canvas.paste(result, (half_canvas - cx, half_canvas - cy_adj))
