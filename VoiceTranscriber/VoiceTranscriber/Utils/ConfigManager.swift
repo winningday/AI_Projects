@@ -51,13 +51,10 @@ final class ConfigManager: ObservableObject {
     // MARK: - Init
 
     private init() {
-        // Default hotkey: Fn key (keyCode 63) with no modifiers
-        self.hotkeyKeyCode = UInt16(defaults.integer(forKey: Keys.hotkeyKeyCode))
-        if self.hotkeyKeyCode == 0 {
-            self.hotkeyKeyCode = 63 // Fn key
-        }
+        // Initialize ALL stored properties first before any conditional logic
+        let savedKeyCode = UInt16(defaults.integer(forKey: Keys.hotkeyKeyCode))
+        self.hotkeyKeyCode = savedKeyCode == 0 ? 63 : savedKeyCode // Fn key default
         self.hotkeyModifiers = UInt(defaults.integer(forKey: Keys.hotkeyModifiers))
-
         self.useHapticFeedback = defaults.object(forKey: Keys.useHapticFeedback) as? Bool ?? true
         self.playSoundEffects = defaults.object(forKey: Keys.playSoundEffects) as? Bool ?? true
         self.autoInjectText = defaults.object(forKey: Keys.autoInjectText) as? Bool ?? true

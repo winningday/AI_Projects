@@ -202,10 +202,11 @@ final class HotKeyManager: ObservableObject {
     static func keyName(for keyCode: UInt16, modifiers: UInt) -> String {
         var parts: [String] = []
 
-        if modifiers & CGEventFlags.maskControl.rawValue != 0 { parts.append("⌃") }
-        if modifiers & CGEventFlags.maskAlternate.rawValue != 0 { parts.append("⌥") }
-        if modifiers & CGEventFlags.maskShift.rawValue != 0 { parts.append("⇧") }
-        if modifiers & CGEventFlags.maskCommand.rawValue != 0 { parts.append("⌘") }
+        let mods = UInt64(modifiers)
+        if mods & CGEventFlags.maskControl.rawValue != 0 { parts.append("⌃") }
+        if mods & CGEventFlags.maskAlternate.rawValue != 0 { parts.append("⌥") }
+        if mods & CGEventFlags.maskShift.rawValue != 0 { parts.append("⇧") }
+        if mods & CGEventFlags.maskCommand.rawValue != 0 { parts.append("⌘") }
 
         let keyName: String
         switch keyCode {
