@@ -14,25 +14,14 @@ struct OnboardingView: View {
     @State private var claudeKey = ""
     @State private var permissionTimer: Timer?
 
+    @Environment(\.colorScheme) private var colorScheme
     private let totalSteps = 3
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                if let appIcon = NSImage(named: NSImage.applicationIconName) {
-                    Image(nsImage: appIcon)
-                        .resizable()
-                        .frame(width: 64, height: 64)
-                } else {
-                    Image(systemName: "mic.badge.plus")
-                        .font(.system(size: 44))
-                        .foregroundStyle(.linearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                }
+                AppLogo(size: 64, colorScheme: colorScheme)
 
                 Text("Welcome to Verbalize")
                     .font(.system(size: 22, weight: .bold))

@@ -3,6 +3,7 @@ import SwiftUI
 /// Main application window with sidebar navigation.
 struct MainWindowView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
@@ -10,12 +11,7 @@ struct MainWindowView: View {
             VStack(spacing: 0) {
                 // App logo/title
                 HStack(spacing: 10) {
-                    if let appIcon = NSImage(named: NSImage.applicationIconName) {
-                        Image(nsImage: appIcon)
-                            .resizable()
-                            .frame(width: 30, height: 30)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                    }
+                    AppLogo(size: 26, colorScheme: colorScheme)
                     Text("Verbalize")
                         .font(.system(size: 14, weight: .semibold))
                 }
