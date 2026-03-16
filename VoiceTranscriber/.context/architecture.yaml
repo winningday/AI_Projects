@@ -1,3 +1,10 @@
+# ---
+# type: architecture
+# scope: VoiceTranscriber
+# purpose: Component connections and data flow — read to understand system without reading source
+# last_updated: 2026-03-16
+# ---
+
 # Verbalize — Architecture & Data Flow
 # Read this to understand how components connect without reading source code.
 

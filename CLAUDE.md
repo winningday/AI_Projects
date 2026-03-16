@@ -1,36 +1,199 @@
-# CLAUDE.md — AI_Projects
+---
+type: root-config
+scope: monorepo
+purpose: Claude Code operating instructions for AI_Projects monorepo
+read: ALWAYS — this is your entry point
+---
 
-## Rules
+# CLAUDE.md — AI_Projects Monorepo
 
-1. **Stay in scope** — this is a monorepo. Each folder is an independent project. Only read, search, and modify files inside the specific project folder you're working on. Never touch sibling project directories.
-2. **Keep branches clean** — when you need to pull updates from main, do NOT run `git pull origin main` or `git merge origin/main` as this drags in every project's files. Instead, cherry-pick only the commits relevant to your project, or use `git checkout origin/main -- <project-folder>/` to pull just the files you need from a specific subdirectory.
-3. **Always update README.md** inside the relevant project folder after any code changes
-4. **Always update the project's `.context/` files** when architecture, files, or features change
-5. **Read `.context/overview.yaml` first** before diving into code — it has the map
-6. **Don't read all source files** — use `.context/` files to find what you need, then read only those files
-7. **Commit and push** after completing work — never leave uncommitted changes
-8. **Branch naming**: always use `claude/` prefix with session suffix
-9. **UI/UX first** — always design intuitive, polished interfaces that match the app's visual theme. Use proper toggle controls, clear labels, consistent spacing, and native macOS patterns. Never use plain text buttons where proper controls exist.
+## 1. Monorepo Isolation (CRITICAL)
 
-## Projects
+This repo contains **independent projects in separate folders**. You MUST:
 
-| Folder | Description | Status |
-|--------|-------------|--------|
-| `VoiceTranscriber/` | **Verbalize** — macOS voice-to-text app with translation | Active |
-| `rotating-gif-maker/` | Logo rotation GIF generator | Complete |
+- **Only touch the project folder you're working on.** Never read, search, or modify sibling directories.
+- **Never `git pull origin main`** — this pulls ALL projects. Instead:
+  ```bash
+  git fetch origin main
+  git checkout origin/main -- <project-folder>/
+  ```
+- **Always sync before working** — fetch the latest version of your project folder before making changes.
 
-## Skills
+## 2. Context System — Read Smart, Not Everything
 
-| Command | Description |
-|---------|-------------|
-| `/design-icon` | Interactive icon design workflow. Asks questions one at a time about your app, audience, and style, then generates 3 optimized prompts for AI image generators (Gemini, DALL-E, Midjourney, Recraft, etc.) with exact macOS icon specs baked in. Supports iteration until you get the perfect logo. |
-| `/make-icon` | Convert a source PNG into a properly formatted macOS `.icns` file. Handles rounded corner fixes (`--fix-corners`), safe zone padding (`--padding`), and all required iconset sizes. Use after `/design-icon` to finalize. |
+Every project uses a **layered context system** to minimize token usage. Follow this lookup order:
 
-> **Global install:** Copy `.claude/skills/design-icon/` and `.claude/skills/make-icon/` to `~/.claude/skills/` to use across all projects.
+```
+1. Root CLAUDE.md          ← You are here. Project index + global rules.
+2. <project>/CLAUDE.md     ← Project-specific rules, stack, build commands.
+3. <project>/.context/     ← Architecture, file maps, decisions. Read overview.yaml FIRST.
+4. <project>/MEMORY.md     ← Session log. What was done, what's pending, gotchas.
+5. <project>/TODO.md       ← Active tasks for this project.
+6. <project>/README.md     ← User-facing docs. Update after code changes.
+```
 
-## Quick Reference
+### Rules
 
-- Primary branch pattern: `claude/<feature>-<session-id>`
-- Build system: Swift Package Manager (VoiceTranscriber)
-- No CI/CD — manual builds on user's Mac
-- User's machine: macOS (Apple Silicon), no Swift on this dev server
+- **All documentation files MUST have YAML frontmatter** describing `type`, `scope`, and `purpose` so you can decide whether to read them without opening the full file.
+- **Never read all source files.** Use `.context/overview.yaml` to find the file you need, then read only that file.
+- **If a doc exceeds ~200 lines**, split it. Create a summary hub that references sub-documents. Each sub-doc gets its own YAML frontmatter.
+- **Prefer YAML over prose** for structured data (file maps, architecture, decisions).
+
+## 3. Memory System
+
+Each project has a `MEMORY.md` — a **running log of what Claude Code has done and learned**. This is how context persists across sessions.
+
+### When to write to MEMORY.md
+
+- After completing any task (what you did, files changed)
+- When you discover a gotcha or non-obvious behavior
+- When a decision is made about architecture or approach
+- When a bug is fixed (root cause + fix summary)
+
+### Format
+
+```yaml
+---
+type: memory-log
+scope: <project-name>
+purpose: Persistent session memory for Claude Code
+last_updated: YYYY-MM-DD
+---
+```
+
+Entries are reverse-chronological (newest first). Each entry:
+
+```markdown
+## YYYY-MM-DD — <Brief Title>
+
+- **What:** One-line summary of work done
+- **Files:** List of files created/modified
+- **Decisions:** Any architectural or design choices made
+- **Gotchas:** Non-obvious things future sessions should know
+- **Next:** What to pick up next (if applicable)
+```
+
+Keep entries **compact**. If details are needed, reference a file path rather than inlining content.
+
+## 4. Task Management (GTD-Inspired)
+
+### Root TODO.md
+
+Cross-project task overview. Only contains **project names + status + next action**. Details live in each project's `TODO.md`.
+
+### Project TODO.md
+
+Each active project maintains its own `TODO.md`:
+
+```yaml
+---
+type: task-list
+scope: <project-name>
+purpose: Active and planned tasks
+last_updated: YYYY-MM-DD
+---
+```
+
+Structure:
+
+```markdown
+## In Progress
+- [ ] Task description → `detail-ref: .context/some-file.yaml#section` (if complex)
+
+## Up Next
+- [ ] Task description
+
+## Done (Recent)
+- [x] Task description (YYYY-MM-DD)
+
+## Backlog
+- [ ] Task description
+```
+
+Rules:
+- **One "In Progress" task at a time per project.** Finish or park before starting another.
+- **Move completed tasks to "Done (Recent)".** Prune monthly — archive old items to MEMORY.md.
+- **Complex tasks** get a detail file in `.context/` rather than bloating TODO.md.
+- **Always update TODO.md** when starting or finishing work.
+
+## 5. Document Conventions
+
+### YAML Frontmatter (Required on ALL .md and .yaml docs)
+
+```yaml
+---
+type: config | context | memory-log | task-list | readme | architecture | reference
+scope: repo | <project-name>
+purpose: <one-line description so Claude can skip if irrelevant>
+last_updated: YYYY-MM-DD          # optional but recommended
+---
+```
+
+### Code Documentation
+
+- **Don't add comments to code you didn't change.**
+- Source files in `.context/overview.yaml` should have a one-line description so Claude can find the right file without reading all source.
+- For complex modules, add a brief `# Module: <purpose>` comment at the top — nothing more.
+
+### Document Splitting Rules
+
+| Lines | Action |
+|-------|--------|
+| < 200 | Keep as single file |
+| 200–400 | Add a table of contents with anchor links |
+| > 400 | Split into hub + sub-documents in `.context/` |
+
+Hub files contain only: frontmatter + summary + links to sub-docs.
+
+## 6. Project Index
+
+| Folder | Status | Stack | CLAUDE.md | .context/ | MEMORY.md | TODO.md |
+|--------|--------|-------|-----------|-----------|-----------|---------|
+| `VoiceTranscriber/` | Active | Swift, SwiftUI, GRDB, OpenAI, Anthropic | Needed | Yes | Needed | Needed |
+| `instagram-assistant/` | Active | Python, Streamlit, SQLite, Claude | Needed | No | Needed | Needed |
+| `resume-maker/` | Active | Python, RenderCV, Claude API | Needed | No | Needed | Needed |
+| `video_editor/` | Active | Python, ffmpeg, Whisper, Claude Vision | Needed | No | Needed | Needed |
+| `watercolor_editor/` | Active | Python, ffmpeg, multi-stage pipeline | Needed | No | Needed | Needed |
+| `rotating-gif-maker/` | Complete | Python, PIL, OpenCV | Has one | No | No | No |
+
+**"Needed"** = create these files when you first work on that project. Use the templates in this document.
+
+## 7. Session Startup Checklist
+
+Every time you start working on a project:
+
+1. **Read this file** (root CLAUDE.md) — you're doing it now.
+2. **Sync the project folder**: `git fetch origin main && git checkout origin/main -- <project>/`
+3. **Read `<project>/CLAUDE.md`** if it exists — project-specific rules.
+4. **Read `<project>/MEMORY.md`** if it exists — pick up where you left off.
+5. **Read `<project>/TODO.md`** if it exists — know what's active.
+6. **Read `<project>/.context/overview.yaml`** if it exists — get the file map.
+7. **Only then** read source files as needed.
+
+## 8. Session Shutdown Checklist
+
+Before ending work:
+
+1. **Update `MEMORY.md`** with what you did this session.
+2. **Update `TODO.md`** — mark done items, add new ones discovered.
+3. **Update `.context/` files** if architecture, files, or features changed.
+4. **Update `README.md`** if user-facing behavior changed.
+5. **Commit and push.** Never leave uncommitted changes.
+
+## 9. Global Rules
+
+- **Branch naming**: `claude/<feature>-<session-id>`
+- **UI/UX first**: Design intuitive, polished interfaces. Use proper native controls, consistent spacing, clear labels. Never use plain text where proper controls exist.
+- **No CI/CD**: Manual builds on user's Mac (Apple Silicon). No Swift compiler on dev server.
+- **Commit often**: Small, focused commits with clear messages.
+- **Don't over-engineer**: Only make changes that are directly requested or clearly necessary.
+
+## 10. Skills
+
+| Command | Use When |
+|---------|----------|
+| `/design-icon` | Need to create/redesign an app icon. Interactive Q&A → AI image gen prompts. |
+| `/make-icon` | Have a PNG, need a macOS `.icns`. Handles corners, padding, all sizes. |
+| `/apply` | Resume maker — takes a job description, generates resume + cover letter + interview prep. |
+
+> **Global install:** Copy `.claude/skills/` to `~/.claude/skills/` to use across all projects.
