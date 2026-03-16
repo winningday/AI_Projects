@@ -51,33 +51,27 @@ def detect_face(img: Image.Image):
 
 def extract_face(img: Image.Image) -> Image.Image | None:
     """
-    Auto-detects a face, removes the background, and isolates just the head
-    (face + hair) — excluding neck, arms, hands, and other people.
+    Auto-detects a face, removes the background, and returns a square canvas
+    containing just the head (hair + face) with no neck.
 
-    Strategy (two masks, intersected):
-      1. rembg on the full image → removes the actual BACKGROUND (walls, etc.)
-      2. Elliptical head mask from face bbox → removes any FOREGROUND body parts
-         (neck, arms, fingers) outside the head silhouette.
-      3. min(rembg_alpha, ellipse) = clean head, no neck, no background.
-
-    Ellipse geometry (no neck):
-      - Center shifted UP by 0.15*fh so the bottom tangent lands at the chin
-      - ell_b = 0.65*fh → bottom = cy_adj + 0.65*fh = fy + fh  (chin)
-                         → top    = cy_adj - 0.65*fh = fy - 0.30*fh (hair)
-      The ellipse rounds off organically at the chin — no hard neck cut.
-
-    No alpha gradients — GIF only supports binary transparency.
+    Strategy:
+      1. rembg on the full image → best bg removal (full context).
+      2. Hard crop to the head region using the face bbox + padding:
+           - 35% above the bbox top   → includes all hair
+           - 22% below the bbox bottom → includes chin tip (OpenCV bbox often
+             ends at the jaw, not the actual chin; 22% covers the gap safely
+             without reaching the neck which starts ~40%+ below).
+           - 15% on each side          → includes ears + breathing room.
+         The crop physically removes the neck — no ellipse math needed.
+      3. Centre-pad the crop onto a square canvas so the circular mask
+         that follows has equal breathing room on all sides.
     """
     face = detect_face(img)
     if face is None:
         return None
 
-    import cv2
-    import numpy as np
-
     fx, fy, fw, fh = face
     w, h = img.size
-    cx, cy = fx + fw // 2, fy + fh // 2
     print(f"  Face detected at ({fx},{fy}) size {fw}×{fh}")
 
     # --- rembg on full image (full context = best segmentation) --------
@@ -90,34 +84,30 @@ def extract_face(img: Image.Image) -> Image.Image | None:
         print("  [warn] rembg not installed — skipping background removal.")
         rgba = img.convert("RGBA")
 
-    rembg_alpha = np.array(rgba.split()[3])
+    # --- Crop to head region (physically eliminates neck) ---------------
+    # pad_bot = 0: crop ends exactly at the bbox bottom (≈ chin level for
+    # haarcascade frontal faces).  Neck pixels are never in the crop, so
+    # rembg can't accidentally keep them.
+    # extra: canvas is made larger than the crop so the circular mask that
+    # follows has breathing room and doesn't clip the chin or the hair top.
+    pad_top = int(fh * 0.35)   # room for hair + forehead
+    pad_bot = 0                 # stop at bbox bottom = chin; NO neck
+    pad_lr  = int(fw * 0.15)   # ear + side breathing room
+    extra   = int(fh * 0.15)   # canvas padding so circle doesn't clip edges
 
-    # --- Elliptical head mask (chin-level bottom, no neck) -------------
-    # Shift center up so the ellipse bottom lands just below the chin.
-    #   cy_adj + ell_b = fy + 0.35*fh + 0.70*fh = fy + 1.05*fh (5% below chin)
-    #   cy_adj - ell_b = fy + 0.35*fh - 0.70*fh = fy - 0.35*fh (above hair)
-    cy_adj = cy - int(fh * 0.15)
-    ell_a  = int(fw * 0.65)   # horizontal semi-axis — wide enough for ears
-    ell_b  = int(fh * 0.70)   # vertical semi-axis   — just clears chin, clips neck
-    ellipse_mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.ellipse(ellipse_mask, center=(cx, cy_adj),
-                axes=(ell_a, ell_b), angle=0,
-                startAngle=0, endAngle=360,
-                color=255, thickness=-1)
-    print(f"  Head ellipse: center=({cx},{cy_adj}) axes=({ell_a},{ell_b})")
+    y1 = max(0, fy - pad_top)
+    y2 = min(h, fy + fh + pad_bot)
+    x1 = max(0, fx - pad_lr)
+    x2 = min(w, fx + fw + pad_lr)
 
-    # --- Intersect: rembg handles bg, ellipse clips neck/arms ----------
-    combined_alpha = np.minimum(rembg_alpha, ellipse_mask)
-    result = rgba.copy()
-    result.putalpha(Image.fromarray(combined_alpha))
+    crop = rgba.crop((x1, y1, x2, y2))
+    cw, ch = crop.size
+    print(f"  Head crop: ({x1},{y1})→({x2},{y2})  {cw}×{ch}")
 
-    # --- Place on square canvas centered on adjusted face center -------
-    # half_canvas=0.95*fh gives the chin comfortable breathing room inside
-    # the circular mask (chin sits at ~74% of the radius, not at the edge).
-    half_canvas = int(fh * 0.95)
-    canvas_size = half_canvas * 2
-    canvas = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    canvas.paste(result, (half_canvas - cx, half_canvas - cy_adj))
+    # --- Centre crop on square canvas with breathing room ---------------
+    side = max(cw, ch) + extra
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    canvas.paste(crop, ((side - cw) // 2, (side - ch) // 2))
     return canvas
 
 
