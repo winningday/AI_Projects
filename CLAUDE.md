@@ -154,6 +154,7 @@ Hub files contain only: frontmatter + summary + links to sub-docs.
 | `resume-maker/` | Active | Python, RenderCV, Claude API | Needed | No | Needed | Needed |
 | `video_editor/` | Active | Python, ffmpeg, Whisper, Claude Vision | Needed | No | Needed | Needed |
 | `watercolor_editor/` | Active | Python, ffmpeg, multi-stage pipeline | Needed | No | Needed | Needed |
+| `VoiceTranscriber-Windows/` | Active | C#, WPF, .NET 8, NAudio, SQLite | Yes | Yes | Yes | Yes |
 | `rotating-gif-maker/` | Complete | Python, PIL, OpenCV | Has one | No | No | No |
 
 **"Needed"** = create these files when you first work on that project. Use the templates in this document.

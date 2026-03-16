@@ -1,0 +1,326 @@
+// Module: Central app orchestrator — manages recording pipeline, state, and coordinates all services
+using System.ComponentModel;
+using System.Media;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using Verbalize.Models;
+
+namespace Verbalize.Services;
+
+public class AppState : INotifyPropertyChanged, IDisposable
+{
+    private static AppState? _instance;
+    public static AppState Instance => _instance ??= new AppState();
+
+    // Services
+    public AudioRecorder AudioRecorder { get; } = new();
+    public HotKeyManager HotKeyManager { get; } = new();
+    public WhisperClient WhisperClient { get; } = new();
+    public ClaudeClient ClaudeClient { get; } = new();
+    public ConfigManager Config { get; } = new();
+    public TranscriptDatabase Database { get; } = new();
+    public CorrectionTracker CorrectionTracker { get; private set; }
+
+    // State
+    private AppStatus _status = AppStatus.Idle;
+    public AppStatus Status
+    {
+        get => _status;
+        set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+    }
+
+    private string _lastTranscript = string.Empty;
+    public string LastTranscript
+    {
+        get => _lastTranscript;
+        set { _lastTranscript = value; OnPropertyChanged(); }
+    }
+
+    private string? _errorMessage;
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set { _errorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasError)); }
+    }
+
+    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    public string StatusText => Status switch
+    {
+        AppStatus.Idle => "Ready",
+        AppStatus.Recording => "Recording...",
+        AppStatus.Processing => "Processing...",
+        AppStatus.Error => ErrorMessage ?? "Error",
+        _ => "Ready"
+    };
+
+    // Stats (computed from config)
+    public int TotalWords => Config.TotalWords;
+    public double TotalRecordingTime => Config.TotalRecordingTime;
+
+    // Supported languages for translation
+    public static readonly string[] SupportedLanguages = {
+        "English", "Spanish", "French", "German", "Italian", "Portuguese",
+        "Chinese", "Japanese", "Korean", "Arabic", "Russian", "Hindi",
+        "Dutch", "Swedish", "Polish", "Turkish", "Vietnamese", "Thai",
+        "Hebrew", "Ukrainian"
+    };
+
+    // Recording overlay window
+    public event Action? RecordingStarted;
+    public event Action? RecordingStopped;
+    public event Action? TranscriptionCompleted;
+
+    private string? _capturedAppName;
+
+    private AppState()
+    {
+        CorrectionTracker = new CorrectionTracker(Config);
+
+        // Configure hotkey from saved settings
+        HotKeyManager.HotKey = Config.HotKey;
+        HotKeyManager.HotKeyModifiers = Config.HotKeyModifiers;
+
+        // Wire up hotkey events
+        HotKeyManager.OnHotkeyDown += OnHotkeyDown;
+        HotKeyManager.OnHotkeyUp += OnHotkeyUp;
+        HotKeyManager.OnHotkeyCaptured += OnHotkeyCaptured;
+
+        // Start listening
+        try
+        {
+            HotKeyManager.StartListening();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to register hotkey: {ex.Message}";
+        }
+    }
+
+    private void OnHotkeyDown()
+    {
+        if (Status == AppStatus.Recording || Status == AppStatus.Processing) return;
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            StartRecording();
+        });
+    }
+
+    private void OnHotkeyUp()
+    {
+        if (Status != AppStatus.Recording) return;
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            StopRecordingAndProcess();
+        });
+    }
+
+    private void OnHotkeyCaptured(Key key, ModifierKeys modifiers)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Config.HotKey = key;
+            Config.HotKeyModifiers = modifiers;
+            HotKeyManager.HotKey = key;
+            HotKeyManager.HotKeyModifiers = modifiers;
+            OnPropertyChanged(nameof(Config));
+        });
+    }
+
+    public void StartRecording()
+    {
+        ErrorMessage = null;
+
+        // Validate API keys
+        if (string.IsNullOrEmpty(Config.OpenAIApiKey))
+        {
+            ErrorMessage = "OpenAI API key not set. Go to Settings to configure.";
+            Status = AppStatus.Error;
+            return;
+        }
+
+        // Capture active app before recording
+        _capturedAppName = Config.ContextAwareness ? TextInjector.GetActiveProcessName() : null;
+
+        Status = AppStatus.Recording;
+        AudioRecorder.StartRecording();
+
+        if (Config.SoundEffects)
+            SystemSounds.Beep.Play();
+
+        RecordingStarted?.Invoke();
+    }
+
+    public async void StopRecordingAndProcess()
+    {
+        if (Status != AppStatus.Recording) return;
+
+        var (filePath, duration) = AudioRecorder.StopRecording();
+
+        if (Config.SoundEffects)
+            SystemSounds.Beep.Play();
+
+        RecordingStopped?.Invoke();
+
+        if (string.IsNullOrEmpty(filePath) || duration < 0.3)
+        {
+            Status = AppStatus.Idle;
+            return;
+        }
+
+        Status = AppStatus.Processing;
+
+        try
+        {
+            await ProcessRecordingAsync(filePath, duration);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Processing failed: {ex.Message}";
+            Status = AppStatus.Error;
+
+            // Auto-clear error after 5 seconds
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(5000);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (Status == AppStatus.Error)
+                    {
+                        ErrorMessage = null;
+                        Status = AppStatus.Idle;
+                    }
+                });
+            });
+        }
+        finally
+        {
+            AudioRecorder.CleanupTempFile(filePath);
+        }
+    }
+
+    private async Task ProcessRecordingAsync(string filePath, double duration)
+    {
+        // Step 1: Transcribe with Whisper
+        var dictionaryWords = Config.DictionaryEntries.Select(e => e.Word).ToList();
+        var languageHint = Config.TranslationEnabled ? null : "en";
+
+        var rawText = await WhisperClient.TranscribeAsync(
+            filePath,
+            Config.OpenAIApiKey,
+            dictionaryWords,
+            languageHint);
+
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            Status = AppStatus.Idle;
+            return;
+        }
+
+        // Step 2: Determine style tone from context
+        var tone = StyleTone.Casual;
+        if (Config.ContextAwareness && !string.IsNullOrEmpty(_capturedAppName))
+        {
+            var context = DetectContext(_capturedAppName);
+            tone = Config.GetStyleForContext(context);
+        }
+
+        // Step 3: Clean with Claude (if API key is set)
+        string cleanedText;
+        if (!string.IsNullOrEmpty(Config.AnthropicApiKey))
+        {
+            cleanedText = await ClaudeClient.CleanTranscriptionAsync(
+                rawText,
+                Config.AnthropicApiKey,
+                tone,
+                dictionaryWords,
+                Config.Corrections,
+                null, // Surrounding context — complex on Windows, skip for now
+                _capturedAppName,
+                Config.TranslationEnabled,
+                Config.TargetLanguage);
+        }
+        else
+        {
+            cleanedText = rawText;
+        }
+
+        // Step 4: Save transcript
+        var transcript = new Transcript
+        {
+            OriginalText = rawText,
+            CleanedText = cleanedText,
+            DurationSeconds = duration
+        };
+        Database.Save(transcript);
+
+        // Step 5: Update stats
+        Config.TotalWords += transcript.WordCount;
+        Config.TotalRecordingTime += duration;
+
+        // Step 6: Inject text
+        if (Config.AutoInject)
+        {
+            await TextInjector.InjectTextAsync(cleanedText);
+            CorrectionTracker.StartTracking(cleanedText);
+        }
+
+        LastTranscript = cleanedText;
+        Status = AppStatus.Idle;
+        TranscriptionCompleted?.Invoke();
+
+        OnPropertyChanged(nameof(TotalWords));
+        OnPropertyChanged(nameof(TotalRecordingTime));
+    }
+
+    private static ContextType DetectContext(string appName)
+    {
+        var lower = appName.ToLowerInvariant();
+
+        if (lower.Contains("whatsapp") || lower.Contains("telegram") ||
+            lower.Contains("signal") || lower.Contains("messenger") ||
+            lower.Contains("imessage"))
+            return ContextType.PersonalMessages;
+
+        if (lower.Contains("slack") || lower.Contains("teams") || lower.Contains("discord"))
+            return ContextType.WorkMessages;
+
+        if (lower.Contains("outlook") || lower.Contains("gmail") ||
+            lower.Contains("thunderbird") || lower.Contains("mail"))
+            return ContextType.Email;
+
+        return ContextType.Other;
+    }
+
+    public void CancelRecording()
+    {
+        if (Status == AppStatus.Recording)
+        {
+            AudioRecorder.StopRecording();
+            Status = AppStatus.Idle;
+            RecordingStopped?.Invoke();
+        }
+    }
+
+    public void Dispose()
+    {
+        HotKeyManager.Dispose();
+        AudioRecorder.Dispose();
+        Database.Dispose();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+public enum AppStatus
+{
+    Idle,
+    Recording,
+    Processing,
+    Error
+}

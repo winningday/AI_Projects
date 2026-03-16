@@ -1,0 +1,59 @@
+---
+type: architecture
+scope: VoiceTranscriber-Windows
+purpose: File map and architecture overview for Claude Code navigation
+last_updated: 2026-03-16
+---
+
+project:
+  name: Verbalize for Windows
+  version: 1.0.0
+  stack: C#, WPF, .NET 8, NAudio, SQLite
+  status: Active
+
+architecture:
+  pattern: MVVM-lite with singleton services
+  entry_point: App.xaml.cs → AppState.Instance
+  data_flow: HotKey → AudioRecorder → WhisperClient → ClaudeClient → TextInjector
+
+files:
+  # Entry
+  Verbalize/App.xaml: XAML application entry, theme resources
+  Verbalize/App.xaml.cs: Startup/shutdown, initializes AppState and SystemTray
+
+  # Models
+  Verbalize/Models/Transcript.cs: Transcript data model (id, timestamps, text, duration)
+  Verbalize/Models/DictionaryEntry.cs: Custom dictionary word entry
+  Verbalize/Models/WordCorrection.cs: Wrong→right correction pair
+  Verbalize/Models/StyleTone.cs: Tone enum (Formal/Casual/VeryCasual/Excited) + context types
+
+  # Services
+  Verbalize/Services/AppState.cs: Central singleton orchestrator — manages recording pipeline and all service coordination
+  Verbalize/Services/AudioRecorder.cs: NAudio WaveInEvent recording (16kHz mono WAV), level monitoring
+  Verbalize/Services/WhisperClient.cs: OpenAI Whisper API (gpt-4o-mini-transcribe + whisper-1 fallback)
+  Verbalize/Services/ClaudeClient.cs: Anthropic Claude API (haiku-4.5) — text cleanup with context-aware system prompt
+  Verbalize/Services/HotKeyManager.cs: Global keyboard hook via Win32 SetWindowsHookEx — push-to-talk + rebinding
+  Verbalize/Services/TextInjector.cs: Clipboard + Win32 SendInput (Ctrl+V) for text injection
+  Verbalize/Services/ConfigManager.cs: JSON settings persistence in %LOCALAPPDATA%\Verbalize\
+  Verbalize/Services/TranscriptDatabase.cs: SQLite database via Microsoft.Data.Sqlite
+  Verbalize/Services/CorrectionTracker.cs: Self-learning corrections with LCS + Levenshtein diff
+
+  # Views
+  Verbalize/Views/MainWindow.xaml: Main app window with sidebar navigation (6 tabs)
+  Verbalize/Views/HomePage.xaml: Dashboard — quick stats, recent transcripts, translation banner
+  Verbalize/Views/HistoryPage.xaml: Searchable transcript list with detail panel
+  Verbalize/Views/StatsPage.xaml: Productivity analytics — speed comparison, weekly chart, metrics
+  Verbalize/Views/DictionaryPage.xaml: Custom word management (add/remove/filter)
+  Verbalize/Views/StylePage.xaml: Per-context tone selection (4 contexts × 4 tones)
+  Verbalize/Views/SettingsPage.xaml: All settings — hotkey, general, intelligence, translation, API keys
+  Verbalize/Views/RecordingOverlay.xaml: Floating transparent window — pulsing dot, waveform, duration
+  Verbalize/Views/OnboardingWindow.xaml: First-run setup wizard (mic + API keys)
+  Verbalize/Views/SystemTrayManager.cs: WinForms NotifyIcon — tray icon + context menu
+
+  # Resources
+  Verbalize/Resources/Theme.xaml: Dark theme — colors, brushes, button/textbox styles
+  Verbalize/Converters/BoolToVisibilityConverter.cs: WPF value converters
+
+  # Build
+  build.bat: Windows batch build script
+  build.ps1: PowerShell build script with publish options
