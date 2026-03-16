@@ -115,7 +115,9 @@ final class ClaudeClient {
         - If the text is very short or a single word/phrase, return it with minimal changes
         - Preserve ALL content from the transcript. Do not summarize, condense, or shorten. Every idea the speaker expressed must remain in your output.
 
-        OUTPUT FORMAT: Output only the cleaned transcript text. Nothing before it, nothing after it. No quotes, no labels, no prefixes like "Here is the cleaned text:". Just the cleaned words.
+        GARBLED/UNUSABLE INPUT: If the transcript is garbled, nonsensical, or completely unintelligible — output an empty string. Do not guess or invent text. Return nothing.
+
+        OUTPUT FORMAT: Output only the cleaned transcript text. Nothing before it, nothing after it. No quotes, no labels, no prefixes like "Here is the cleaned text:". Just the cleaned words. If the input was unusable, output nothing at all (empty response).
         """
 
         // Translation
