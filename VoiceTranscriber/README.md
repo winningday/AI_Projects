@@ -10,6 +10,7 @@ A privacy-first macOS voice-to-text application with real-time translation. Reco
 - **Real-time waveform** — Floating window shows audio levels while recording
 - **Whisper transcription** — Fast, accurate speech-to-text via OpenAI's Whisper API (gpt-4o-mini-transcribe with whisper-1 fallback)
 - **Claude cleanup** — Removes filler words, fixes stuttering, resolves self-corrections using Claude Haiku 4.5 while preserving the full content and length of your dictation
+- **Self-learning corrections** — Detects when you edit injected text, auto-adds corrected words to your dictionary, and feeds past corrections into future prompts so accuracy improves with every use
 - **Real-time translation** — Speak in any language, output in your target language (20 languages supported)
 - **Context-aware formatting** — Detects your active app and adapts style (casual for Messages, formal for Email)
 - **Custom dictionary** — Learns names, technical terms, and brand words for better accuracy
@@ -143,8 +144,9 @@ VoiceTranscriber/
 │   ├── Hotkey/
 │   │   └── HotKeyManager.swift           # CGEvent tap + NSEvent fallback
 │   └── Utils/
-│       ├── TextInjection.swift           # AX API / pasteboard text injection
-│       └── ConfigManager.swift           # UserDefaults config + API keys + Keychain migration
+│       ├── TextInjection.swift           # AX API / pasteboard text injection + field reading
+│       ├── CorrectionTracker.swift       # Self-learning feedback loop (diff detection, auto-dictionary)
+│       └── ConfigManager.swift           # UserDefaults config + API keys + corrections + Keychain migration
 └── .gitignore
 ```
 
@@ -158,9 +160,10 @@ The app follows a centralized state pattern with a menu bar + window hybrid:
    - Starts **AudioRecorder** (AVAudioEngine, 16kHz mono) and shows the waveform overlay
    - On release, sends audio to **WhisperClient** with dictionary hints
    - Detects app context and selects the appropriate style tone
-   - Passes raw text to **ClaudeClient** for cleanup + optional translation
+   - Passes raw text to **ClaudeClient** for cleanup + optional translation (including past corrections)
    - Saves to **TranscriptDatabase** (GRDB/SQLite)
    - Uses **TextInjector** to type the cleaned text into the active app
+   - **CorrectionTracker** snapshots the field, waits 5s, diffs to detect user edits, auto-adds corrected words to dictionary, and stores correction pairs for future prompts
 3. **MenuBarExtra** provides persistent UI with translation toggle and quick actions
 4. **MainAppWindow** (NSWindow subclass) provides the full settings/dashboard interface
 

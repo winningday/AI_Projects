@@ -20,7 +20,8 @@ final class ClaudeClient {
         contextText: String? = nil,
         smartFormatting: Bool = true,
         translationEnabled: Bool = false,
-        targetLanguage: String = "en"
+        targetLanguage: String = "en",
+        recentCorrections: [WordCorrection] = []
     ) async throws -> String {
         guard let apiKey = ConfigManager.shared.claudeAPIKey, !apiKey.isEmpty else {
             throw ClaudeError.missingAPIKey
@@ -43,7 +44,8 @@ final class ClaudeClient {
             contextText: contextText,
             smartFormatting: smartFormatting,
             translationEnabled: translationEnabled,
-            targetLanguage: targetLanguage
+            targetLanguage: targetLanguage,
+            recentCorrections: recentCorrections
         )
 
         let requestBody = ClaudeRequestWithSystem(
@@ -93,7 +95,8 @@ final class ClaudeClient {
         contextText: String?,
         smartFormatting: Bool,
         translationEnabled: Bool,
-        targetLanguage: String
+        targetLanguage: String,
+        recentCorrections: [WordCorrection]
     ) -> String {
         var prompt = """
         You are a text-cleaning pipeline stage in a voice transcription app. You are NOT a chatbot, NOT a conversation partner, NOT an assistant. You cannot hear, think, or respond to the user. You are a dumb text filter.
@@ -146,6 +149,16 @@ final class ClaudeClient {
 
             \nCUSTOM DICTIONARY (use these exact spellings when you hear these words or similar-sounding words):
             \(words)
+            """
+        }
+
+        // Recent corrections (self-learning from user edits)
+        if !recentCorrections.isEmpty {
+            let correctionLines = recentCorrections.suffix(20).map { "\"\($0.original)\" → \"\($0.corrected)\"" }
+            prompt += """
+
+            \nPAST CORRECTIONS (the user previously corrected these words — apply the same corrections when you see these words):
+            \(correctionLines.joined(separator: "\n"))
             """
         }
 

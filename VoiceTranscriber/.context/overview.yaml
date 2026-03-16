@@ -60,13 +60,15 @@ file_map:
     RecordingWindow.swift: Floating waveform overlay during recording
     SettingsView.swift: Legacy settings (not actively used)
   Utils/:
-    ConfigManager.swift: All settings, UserDefaults API keys (base64 obfuscated), Keychain migration, dictionary, style profiles, translation config
-    TextInjection.swift: AX API / clipboard text injection into active field
+    ConfigManager.swift: All settings, UserDefaults API keys (base64 obfuscated), Keychain migration, dictionary, style profiles, translation config, correction history
+    TextInjection.swift: AX API / clipboard text injection + full field reading for correction tracking
+    CorrectionTracker.swift: Self-learning feedback loop — snapshots field after injection, diffs after delay, extracts word corrections, auto-adds to dictionary, stores correction pairs
 
 features:
   - Push-to-talk recording via configurable hotkey
   - Whisper transcription with custom dictionary hints
-  - Claude cleanup (filler removal, self-correction, formatting)
+  - Claude cleanup (filler removal, self-correction, formatting, past corrections fed into prompt)
+  - Self-learning corrections (post-injection diff detection, auto-dictionary, correction history)
   - Real-time translation (20 languages, toggle from menu bar)
   - Context-aware style (detects active app, adjusts tone)
   - Custom dictionary (names, technical terms)

@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
     private let recordingWindow = RecordingWindowController()
+    private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
     private var cancellables = Set<AnyCancellable>()
     /// Captured before recording starts for context-aware transcription
     private var capturedContext: String?
@@ -161,6 +162,9 @@ final class AppState: ObservableObject {
     func startRecording() {
         guard !isRecording && !isProcessing else { return }
 
+        // Cancel any pending correction check from previous transcription
+        correctionTracker.cancelPending()
+
         // Capture context BEFORE recording (while user is in their app)
         if config.contextAwareness {
             capturedContext = TextInjector.readContextFromActiveField()
@@ -264,7 +268,7 @@ final class AppState: ObservableObject {
             // Step 2: Determine style based on active app
             let styleTone = detectStyleTone(appName: activeApp)
 
-            // Step 3: Clean with Claude (dictionary, style, context, smart formatting, translation)
+            // Step 3: Clean with Claude (dictionary, style, context, smart formatting, translation, corrections)
             statusMessage = "Cleaning up..."
             let cleanedText = try await claudeClient.cleanTranscription(
                 rawText,
@@ -274,7 +278,8 @@ final class AppState: ObservableObject {
                 contextText: config.contextAwareness ? contextText : nil,
                 smartFormatting: config.smartFormatting,
                 translationEnabled: config.translationEnabled,
-                targetLanguage: config.targetLanguage
+                targetLanguage: config.targetLanguage,
+                recentCorrections: config.recentCorrections
             )
 
             // Step 4: Save
@@ -288,6 +293,9 @@ final class AppState: ObservableObject {
             // Step 5: Inject text (APPENDS at cursor)
             if config.autoInjectText {
                 TextInjector.inject(text: cleanedText)
+
+                // Step 6: Start tracking corrections (self-learning feedback loop)
+                correctionTracker.startTracking(transcript: transcript, injectedText: cleanedText)
             }
 
             lastTranscript = transcript

@@ -121,6 +121,7 @@ final class ConfigManager: ObservableObject {
         static let translationEnabled = "translationEnabled"
         static let targetLanguage = "targetLanguage"
         static let typingSpeed = "typingSpeed"
+        static let corrections = "corrections"
     }
 
     // MARK: - API Key Storage Keys
@@ -215,6 +216,17 @@ final class ConfigManager: ObservableObject {
         ("uk", "Ukrainian"),
     ]
 
+    // MARK: - Corrections (self-learning)
+
+    @Published var corrections: [WordCorrection] = [] {
+        didSet { saveCorrections() }
+    }
+
+    /// Recent corrections for inclusion in Claude prompts (last 30)
+    var recentCorrections: [WordCorrection] {
+        Array(corrections.suffix(30))
+    }
+
     // MARK: - Dictionary
 
     @Published var dictionaryEntries: [DictionaryEntry] = [] {
@@ -274,6 +286,12 @@ final class ConfigManager: ObservableObject {
         if let data = defaults.data(forKey: Keys.dictionaryEntries),
            let entries = try? JSONDecoder().decode([DictionaryEntry].self, from: data) {
             self.dictionaryEntries = entries
+        }
+
+        // Load corrections
+        if let data = defaults.data(forKey: Keys.corrections),
+           let saved = try? JSONDecoder().decode([WordCorrection].self, from: data) {
+            self.corrections = saved
         }
 
         // Load style profiles
@@ -359,6 +377,35 @@ final class ConfigManager: ObservableObject {
 
     func removeDictionaryEntry(_ entry: DictionaryEntry) {
         dictionaryEntries.removeAll { $0.id == entry.id }
+    }
+
+    // MARK: - Corrections Persistence
+
+    private func saveCorrections() {
+        if let data = try? JSONEncoder().encode(corrections) {
+            defaults.set(data, forKey: Keys.corrections)
+        }
+    }
+
+    func addCorrections(_ newCorrections: [WordCorrection]) {
+        for correction in newCorrections {
+            // Don't duplicate existing corrections for the same word pair
+            let exists = corrections.contains {
+                $0.original.lowercased() == correction.original.lowercased() &&
+                $0.corrected.lowercased() == correction.corrected.lowercased()
+            }
+            if !exists {
+                corrections.append(correction)
+            }
+        }
+        // Cap at 200 entries to avoid unbounded growth
+        if corrections.count > 200 {
+            corrections = Array(corrections.suffix(200))
+        }
+    }
+
+    func clearCorrections() {
+        corrections = []
     }
 
     // MARK: - Style Persistence
