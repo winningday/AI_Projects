@@ -99,6 +99,14 @@ if [ -f "${SOURCE_ICON}" ]; then
             || echo "==> Warning: iconutil failed, app will use default icon"
         rm -rf "${ICON_DIR}"
     fi
+    # Generate transparent logo for in-app use (sidebar, onboarding, etc.)
+    TRANSPARENT_LOGO="${RESOURCES}/logo-transparent.png"
+    if python3 "${SCRIPT_DIR}/strip-background.py" "${SOURCE_ICON}" "${TRANSPARENT_LOGO}" 2>&1; then
+        echo "==> Transparent logo generated for in-app use"
+    else
+        echo "==> Warning: Transparent logo generation failed"
+    fi
+
     # Clean up processed icon
     rm -f "${PROCESSED_ICON}"
 else

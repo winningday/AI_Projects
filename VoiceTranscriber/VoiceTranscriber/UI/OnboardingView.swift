@@ -20,10 +20,17 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                if let appIcon = NSImage(named: NSImage.applicationIconName) {
+                if let logoURL = Bundle.main.url(forResource: "logo-transparent", withExtension: "png"),
+                   let logoImage = NSImage(contentsOf: logoURL) {
+                    Image(nsImage: logoImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 64, height: 64)
+                } else if let appIcon = NSImage(named: NSImage.applicationIconName) {
                     Image(nsImage: appIcon)
                         .resizable()
                         .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 } else {
                     Image(systemName: "mic.badge.plus")
                         .font(.system(size: 44))
