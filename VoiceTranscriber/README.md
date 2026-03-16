@@ -9,7 +9,7 @@ A privacy-first macOS voice-to-text application with real-time translation. Reco
 - **Push-to-talk recording** — Hold your hotkey (default: Fn) to record, release to process
 - **Real-time waveform** — Floating window shows audio levels while recording
 - **Whisper transcription** — Fast, accurate speech-to-text via OpenAI's Whisper API (gpt-4o-mini-transcribe with whisper-1 fallback)
-- **Claude cleanup** — Removes filler words, fixes stuttering, resolves self-corrections using Claude Haiku 4.5
+- **Claude cleanup** — Removes filler words, fixes stuttering, resolves self-corrections using Claude Haiku 4.5 while preserving the full content and length of your dictation
 - **Real-time translation** — Speak in any language, output in your target language (20 languages supported)
 - **Context-aware formatting** — Detects your active app and adapts style (casual for Messages, formal for Email)
 - **Custom dictionary** — Learns names, technical terms, and brand words for better accuracy
