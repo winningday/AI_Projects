@@ -70,13 +70,13 @@ enum StyleTone: String, CaseIterable, Codable, Identifiable {
     var promptInstructions: String {
         switch self {
         case .formal:
-            return "Use proper capitalization, full punctuation, and complete sentences."
+            return "Use proper capitalization, full punctuation, and complete sentences. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense."
         case .casual:
-            return "Use proper capitalization but minimal punctuation. Skip periods at the end of short messages. Keep contractions."
+            return "Use proper capitalization but minimal punctuation. Skip periods at the end of short messages. Keep contractions. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense."
         case .veryCasual:
-            return "Use all lowercase. Minimal punctuation. Skip periods. Keep it natural, like texting. Do NOT shorten or remove content."
+            return "Use all lowercase. Minimal punctuation. Skip periods. Keep it natural, like texting. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize, condense, or shorten."
         case .excited:
-            return "Use proper capitalization. Add exclamation marks for emphasis. Keep energy high."
+            return "Use proper capitalization. Add exclamation marks for emphasis. Keep energy high. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense."
         }
     }
 }
