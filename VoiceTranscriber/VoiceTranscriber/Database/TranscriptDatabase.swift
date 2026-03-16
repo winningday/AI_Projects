@@ -45,6 +45,13 @@ final class TranscriptDatabase: ObservableObject {
                 t.column("cleanedText", .text).notNull()
                 t.column("durationSeconds", .double).notNull()
             }
+
+            // Migration: add correctedText column (v1.3)
+            if try !db.columns(in: "transcript").contains(where: { $0.name == "correctedText" }) {
+                try db.alter(table: "transcript") { t in
+                    t.add(column: "correctedText", .text)
+                }
+            }
         }
     }
 
@@ -80,6 +87,20 @@ final class TranscriptDatabase: ObservableObject {
         }
     }
 
+    func updateCorrectedText(_ correctedText: String, for transcript: Transcript) throws {
+        try dbQueue?.write { db in
+            try db.execute(
+                sql: "UPDATE transcript SET correctedText = ? WHERE id = ?",
+                arguments: [correctedText, transcript.id.uuidString]
+            )
+        }
+        DispatchQueue.main.async {
+            if let index = self.transcripts.firstIndex(where: { $0.id == transcript.id }) {
+                self.transcripts[index].correctedText = correctedText
+            }
+        }
+    }
+
     func deleteAll() throws {
         try dbQueue?.write { db in
             try db.execute(sql: "DELETE FROM transcript")
@@ -111,6 +132,7 @@ private struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord {
     let originalText: String
     let cleanedText: String
     let durationSeconds: Double
+    let correctedText: String?
 
     init(from transcript: Transcript) {
         self.id = transcript.id.uuidString
@@ -118,6 +140,7 @@ private struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord {
         self.originalText = transcript.originalText
         self.cleanedText = transcript.cleanedText
         self.durationSeconds = transcript.durationSeconds
+        self.correctedText = transcript.correctedText
     }
 
     func toTranscript() -> Transcript {
@@ -126,7 +149,8 @@ private struct TranscriptRecord: Codable, FetchableRecord, PersistableRecord {
             timestamp: timestamp,
             originalText: originalText,
             cleanedText: cleanedText,
-            durationSeconds: durationSeconds
+            durationSeconds: durationSeconds,
+            correctedText: correctedText
         )
     }
 }
