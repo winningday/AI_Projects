@@ -113,6 +113,15 @@ else
     echo "==> Warning: icon.png not found, skipping icon generation"
 fi
 
+# Copy menu bar icon assets to app bundle
+MENUBAR_ICONS_DIR="${SCRIPT_DIR}/VoiceTranscriber/Resources"
+if [ -d "${MENUBAR_ICONS_DIR}" ]; then
+    for icon in "${MENUBAR_ICONS_DIR}"/MenuBarIcon@*.png; do
+        [ -f "$icon" ] && cp "$icon" "${RESOURCES}/"
+    done
+    echo "==> Menu bar icons copied to app bundle"
+fi
+
 # Create Info.plist
 cat > "${CONTENTS}/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
