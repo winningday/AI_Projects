@@ -54,10 +54,21 @@ cp "${EXECUTABLE}" "${MACOS}/${DISPLAY_NAME}"
 # Generate app icon using make-icon.sh
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_ICON="${SCRIPT_DIR}/icon.png"
+PROCESSED_ICON="${SCRIPT_DIR}/.icon-processed.png"
 
 if [ -f "${SOURCE_ICON}" ]; then
+    # Preprocess: enlarge logo content to fill 80% of canvas
+    # (AI generators create logos with excessive padding)
+    ICON_TO_USE="${SOURCE_ICON}"
+    if python3 "${SCRIPT_DIR}/enlarge-logo.py" "${SOURCE_ICON}" "${PROCESSED_ICON}" 80 2>&1; then
+        ICON_TO_USE="${PROCESSED_ICON}"
+        echo "==> Logo enlarged to fill icon canvas"
+    else
+        echo "==> Warning: Logo enlargement failed, using original icon"
+    fi
+
     if [ -x "${SCRIPT_DIR}/make-icon.sh" ]; then
-        "${SCRIPT_DIR}/make-icon.sh" "${SOURCE_ICON}" "${RESOURCES}/AppIcon.icns" \
+        "${SCRIPT_DIR}/make-icon.sh" "${ICON_TO_USE}" "${RESOURCES}/AppIcon.icns" \
             || echo "==> Warning: make-icon.sh failed, trying direct iconutil..."
     fi
 
@@ -67,7 +78,7 @@ if [ -f "${SOURCE_ICON}" ]; then
         ICON_DIR="${RESOURCES}/AppIcon.iconset"
         mkdir -p "${ICON_DIR}"
         TEMP="${ICON_DIR}/_source.png"
-        cp "${SOURCE_ICON}" "${TEMP}"
+        cp "${ICON_TO_USE}" "${TEMP}"
         for size in 16 32 64 128 256 512 1024; do
             sips -z "${size}" "${size}" "${TEMP}" --out "${ICON_DIR}/_s${size}.png" >/dev/null 2>&1
         done
@@ -88,6 +99,8 @@ if [ -f "${SOURCE_ICON}" ]; then
             || echo "==> Warning: iconutil failed, app will use default icon"
         rm -rf "${ICON_DIR}"
     fi
+    # Clean up processed icon
+    rm -f "${PROCESSED_ICON}"
 else
     echo "==> Warning: icon.png not found, skipping icon generation"
 fi

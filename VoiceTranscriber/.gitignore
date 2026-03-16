@@ -25,6 +25,9 @@ Package.resolved
 # Environment
 .env
 
+# Build artifacts
+.icon-processed.png
+
 # macOS
 .DS_Store
 *.swp
