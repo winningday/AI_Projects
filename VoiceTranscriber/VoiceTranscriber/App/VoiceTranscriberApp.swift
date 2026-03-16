@@ -6,6 +6,7 @@ import Combine
 
 enum AppTab: String, CaseIterable, Identifiable {
     case home = "Home"
+    case history = "History"
     case stats = "Stats"
     case dictionary = "Dictionary"
     case style = "Style"
@@ -16,6 +17,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .home: return "house"
+        case .history: return "clock.arrow.circlepath"
         case .stats: return "chart.bar"
         case .dictionary: return "character.book.closed"
         case .style: return "textformat"
@@ -35,6 +37,7 @@ final class AppState: ObservableObject {
     @Published var statusMessage: String = "Ready"
     @Published var selectedTab: AppTab = .home
     @Published var totalWordsTranscribed: Int = 0
+    var hasLaunched = false
     @Published var totalRecordingSeconds: Double = 0
 
     let audioRecorder = AudioRecorder()
@@ -246,6 +249,7 @@ final class AppState: ObservableObject {
             statusMessage = "Transcribing..."
             let rawText = try await whisperClient.transcribe(
                 fileURL: url,
+                language: config.translationEnabled ? nil : "en",
                 dictionaryWords: config.dictionaryWords,
                 contextHint: contextText
             )
@@ -325,7 +329,7 @@ final class AppState: ObservableObject {
     }
 
     func showTranscriptHistory() {
-        selectedTab = .home
+        selectedTab = .history
         showMainWindow()
     }
 
@@ -379,6 +383,9 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func appDidFinishLaunching() {
+        guard !hasLaunched else { return }
+        hasLaunched = true
+
         if !config.hasCompletedOnboarding {
             showOnboardingWindow()
         } else {
@@ -412,6 +419,10 @@ final class MainAppWindow: NSWindow {
         self.title = "Verbalize"
         self.center()
         self.minSize = NSSize(width: 700, height: 450)
+        self.titlebarAppearsTransparent = false
+        self.titleVisibility = .visible
+        self.isOpaque = true
+        self.backgroundColor = .windowBackgroundColor
         self.contentView = NSHostingView(rootView: MainWindowView(appState: appState))
         self.isReleasedWhenClosed = false
         self.delegate = WindowDelegate.shared
@@ -449,15 +460,33 @@ struct VerbalizeApp: App {
     @StateObject private var appState = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {}
+
     var body: some Scene {
         // Menu bar icon (always present)
         MenuBarExtra {
             MenuBarView(appState: appState)
+                .onAppear {
+                    // Trigger launch logic on first menu bar appearance
+                    // (also handles the case where AppDelegate fires before appState is ready)
+                    if !appState.hasLaunched {
+                        appState.appDidFinishLaunching()
+                    }
+                }
         } label: {
             Label {
                 Text("Verbalize")
             } icon: {
                 Image(systemName: menuBarIcon)
+            }
+            .onAppear {
+                // The label's onAppear fires at app launch (unlike the content's onAppear
+                // which only fires when the user clicks the menu bar icon)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !appState.hasLaunched {
+                        appState.appDidFinishLaunching()
+                    }
+                }
             }
         }
         .menuBarExtraStyle(.window)

@@ -5,7 +5,7 @@ struct MainWindowView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             // Sidebar
             VStack(spacing: 0) {
                 // App logo/title
@@ -62,6 +62,8 @@ struct MainWindowView: View {
             switch appState.selectedTab {
             case .home:
                 HomeView(appState: appState)
+            case .history:
+                TranscriptHistoryView(database: appState.database)
             case .stats:
                 StatsView(appState: appState)
             case .dictionary:
@@ -77,6 +79,7 @@ struct MainWindowView: View {
                 )
             }
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
     private var statusColor: Color {

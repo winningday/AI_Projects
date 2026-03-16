@@ -269,9 +269,6 @@ struct MenuBarView: View {
             .padding(.vertical, 4)
         }
         .frame(width: 300)
-        .onAppear {
-            appState.appDidFinishLaunching()
-        }
     }
 
     // MARK: - Helpers
