@@ -1,0 +1,267 @@
+import SwiftUI
+import Combine
+
+// MARK: - Navigation
+
+enum AppTab: String, CaseIterable, Identifiable {
+    case home = "Home"
+    case history = "History"
+    case stats = "Stats"
+    case dictionary = "Dictionary"
+    case style = "Style"
+    case settings = "Settings"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .home: return "house"
+        case .history: return "clock.arrow.circlepath"
+        case .stats: return "chart.bar"
+        case .dictionary: return "character.book.closed"
+        case .style: return "textformat"
+        case .settings: return "gear"
+        }
+    }
+}
+
+// MARK: - App State (Orchestrator)
+
+@MainActor
+final class AppState: ObservableObject {
+    @Published var isRecording = false
+    @Published var isProcessing = false
+    @Published var lastTranscript: Transcript?
+    @Published var lastError: String?
+    @Published var statusMessage: String = "Ready"
+    @Published var selectedTab: AppTab = .home
+    @Published var totalWordsTranscribed: Int = 0
+    @Published var totalRecordingSeconds: Double = 0
+
+    let audioRecorder = AudioRecorderIOS()
+    let levelMonitor: AudioLevelMonitor
+    let database = TranscriptDatabase.shared
+    let config = SharedConfig.shared
+
+    private let whisperClient = WhisperClient()
+    private let claudeClient = ClaudeClient()
+    private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        self.levelMonitor = AudioLevelMonitor(recorder: audioRecorder)
+        computeTotalWords()
+        computeTotalRecordingTime()
+
+        config.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
+
+    private func computeTotalWords() {
+        totalWordsTranscribed = database.transcripts.reduce(0) {
+            $0 + $1.cleanedText.split(separator: " ").count
+        }
+    }
+
+    private func computeTotalRecordingTime() {
+        totalRecordingSeconds = database.transcripts.reduce(0.0) {
+            $0 + $1.durationSeconds
+        }
+    }
+
+    var wordsPerMinute: Int {
+        guard totalRecordingSeconds > 5 else { return 0 }
+        return Int(Double(totalWordsTranscribed) / (totalRecordingSeconds / 60.0))
+    }
+
+    var speedMultiplier: Double {
+        guard config.typingSpeed > 0, wordsPerMinute > 0 else { return 0 }
+        return Double(wordsPerMinute) / Double(config.typingSpeed)
+    }
+
+    var minutesSaved: Double {
+        guard config.typingSpeed > 0, totalWordsTranscribed > 0 else { return 0 }
+        let typingMinutes = Double(totalWordsTranscribed) / Double(config.typingSpeed)
+        let voiceMinutes = totalRecordingSeconds / 60.0
+        return max(0, typingMinutes - voiceMinutes)
+    }
+
+    var todayWordCount: Int {
+        database.transcripts
+            .filter { Calendar.current.isDateInToday($0.timestamp) }
+            .reduce(0) { $0 + $1.cleanedText.split(separator: " ").count }
+    }
+
+    var todayTranscriptCount: Int {
+        database.transcripts.filter { Calendar.current.isDateInToday($0.timestamp) }.count
+    }
+
+    var weeklyWordCounts: [(date: Date, words: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).reversed().map { daysAgo in
+            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
+            let words = database.transcripts
+                .filter { calendar.isDate($0.timestamp, inSameDayAs: date) }
+                .reduce(0) { $0 + $1.cleanedText.split(separator: " ").count }
+            return (date: date, words: words)
+        }
+    }
+
+    // MARK: - Recording Flow (for in-app recording)
+
+    func startRecording() {
+        guard !isRecording && !isProcessing else { return }
+
+        Task {
+            let granted = await AudioRecorderIOS.requestMicrophonePermission()
+            guard granted else {
+                lastError = "Microphone permission denied."
+                statusMessage = "Mic access needed"
+                return
+            }
+
+            do {
+                let _ = try audioRecorder.startRecording()
+                isRecording = true
+                lastError = nil
+                statusMessage = "Recording..."
+
+                // Haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+            } catch {
+                lastError = "Failed to start recording: \(error.localizedDescription)"
+                statusMessage = "Error"
+            }
+        }
+    }
+
+    func stopRecordingAndProcess() {
+        guard isRecording else { return }
+
+        guard let result = audioRecorder.stopRecording() else {
+            isRecording = false
+            statusMessage = "Ready"
+            return
+        }
+
+        isRecording = false
+        isProcessing = true
+        statusMessage = "Processing..."
+
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+
+        Task {
+            await processRecording(url: result.url, duration: result.duration)
+        }
+    }
+
+    func cancelRecording() {
+        audioRecorder.cancelRecording()
+        isRecording = false
+        isProcessing = false
+        statusMessage = "Ready"
+        levelMonitor.reset()
+    }
+
+    // MARK: - Processing Pipeline
+
+    private func processRecording(url: URL, duration: TimeInterval) async {
+        defer {
+            audioRecorder.cleanupTempFile(url: url)
+        }
+
+        do {
+            statusMessage = "Transcribing..."
+            let rawText = try await whisperClient.transcribe(
+                fileURL: url,
+                language: config.translationEnabled ? nil : "en",
+                dictionaryWords: config.dictionaryWords
+            )
+
+            guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                isProcessing = false
+                statusMessage = "Ready"
+                lastError = "No speech detected."
+                return
+            }
+
+            statusMessage = "Cleaning up..."
+            let cleanedText = try await claudeClient.cleanTranscription(
+                rawText,
+                dictionaryWords: config.dictionaryWords,
+                styleTone: config.defaultStyleTone,
+                smartFormatting: config.smartFormatting,
+                translationEnabled: config.translationEnabled,
+                targetLanguage: config.targetLanguage,
+                recentCorrections: config.recentCorrections
+            )
+
+            let transcript = Transcript(
+                originalText: rawText,
+                cleanedText: cleanedText,
+                durationSeconds: duration
+            )
+            try database.save(transcript)
+
+            // Copy to clipboard for easy pasting
+            UIPasteboard.general.string = cleanedText
+
+            lastTranscript = transcript
+            isProcessing = false
+            statusMessage = "Copied to clipboard"
+            lastError = nil
+            computeTotalWords()
+            computeTotalRecordingTime()
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            // Reset status after a delay
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if statusMessage == "Copied to clipboard" {
+                statusMessage = "Ready"
+            }
+
+        } catch {
+            isProcessing = false
+            statusMessage = "Error"
+            lastError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - App Entry Point
+
+@main
+struct VerbalizeIOSApp: App {
+    @StateObject private var appState = AppState()
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView(appState: appState)
+        }
+    }
+}
+
+// MARK: - Content View (Root)
+
+struct ContentView: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        Group {
+            if appState.config.hasCompletedOnboarding {
+                MainTabView(appState: appState)
+            } else {
+                OnboardingView(config: appState.config) {
+                    appState.config.hasCompletedOnboarding = true
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,74 @@
+<Page x:Class="Verbalize.Views.StylePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBrush}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="30">
+        <StackPanel MaxWidth="700">
+            <TextBlock Text="Style Profiles" FontSize="28" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+            <TextBlock Text="Set the tone for different contexts. Verbalize auto-detects the active app." FontSize="14"
+                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,24" />
+
+            <!-- Personal Messages -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Personal Messages" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="WhatsApp, Telegram, Signal, Messenger" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,10" />
+                    <ComboBox x:Name="PersonalCombo" SelectionChanged="PersonalCombo_Changed"
+                              Width="200" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="PersonalExample" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Work Messages -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Work Messages" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="Slack, Teams, Discord" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,10" />
+                    <ComboBox x:Name="WorkCombo" SelectionChanged="WorkCombo_Changed"
+                              Width="200" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="WorkExample" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Email -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Email" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="Outlook, Gmail, Thunderbird" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,10" />
+                    <ComboBox x:Name="EmailCombo" SelectionChanged="EmailCombo_Changed"
+                              Width="200" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="EmailExample" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Other -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Other Apps" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="Default for all other applications" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,10" />
+                    <ComboBox x:Name="OtherCombo" SelectionChanged="OtherCombo_Changed"
+                              Width="200" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="OtherExample" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
