@@ -477,7 +477,11 @@ struct VerbalizeApp: App {
             Label {
                 Text("Verbalize")
             } icon: {
-                Image(systemName: menuBarIcon)
+                if appState.isRecording || appState.isProcessing {
+                    Image(systemName: menuBarIcon)
+                } else {
+                    menuBarCustomIcon
+                }
             }
             .onAppear {
                 // The label's onAppear fires at app launch (unlike the content's onAppear
@@ -494,8 +498,25 @@ struct VerbalizeApp: App {
 
     private var menuBarIcon: String {
         if appState.isRecording { return "mic.fill" }
-        if appState.isProcessing { return "ellipsis.circle" }
-        return "mic"
+        return "ellipsis.circle"
+    }
+
+    private var menuBarCustomIcon: some View {
+        Group {
+            if let nsImage = Self.loadMenuBarIcon() {
+                Image(nsImage: nsImage)
+            } else {
+                Image(systemName: "mic")
+            }
+        }
+    }
+
+    private static func loadMenuBarIcon() -> NSImage? {
+        guard let url = Bundle.main.url(forResource: "MenuBarIcon@2x", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.isTemplate = true
+        image.size = NSSize(width: 22, height: 22)
+        return image
     }
 }
 

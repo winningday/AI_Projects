@@ -20,6 +20,7 @@ A privacy-first macOS voice-to-text application with real-time translation. Reco
 - **Configurable hotkey** — Rebind to any key or key combination in Settings
 - **Smart formatting** — Auto-detects code, technical terms, numbered lists
 - **Secure key storage** — API keys stored with obfuscation in UserDefaults (auto-migrated from Keychain on upgrade)
+- **Custom menu bar icon** — Branded waveform logo as the menu bar icon (auto-tints for light/dark mode)
 - **Menu bar app** — Lives in the menu bar with quick translation toggle and language picker
 
 ## Supported Translation Languages
@@ -142,6 +143,10 @@ VoiceTranscriber/
 │   │   └── RecordingWindow.swift         # Floating waveform overlay
 │   ├── Hotkey/
 │   │   └── HotKeyManager.swift           # CGEvent tap + NSEvent fallback
+│   ├── Resources/
+│   │   ├── MenuBarIcon@1x.png            # Menu bar icon 22x22 (template image)
+│   │   ├── MenuBarIcon@2x.png            # Menu bar icon 44x44 Retina
+│   │   └── MenuBarIcon@3x.png            # Menu bar icon 66x66
 │   └── Utils/
 │       ├── TextInjection.swift           # AX API / pasteboard text injection
 │       └── ConfigManager.swift           # UserDefaults config + API keys + Keychain migration
