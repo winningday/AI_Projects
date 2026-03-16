@@ -109,11 +109,12 @@ final class ClaudeClient {
         4. NEVER add explanations, commentary, apologies, or meta-text.
         5. If the input seems garbled, nonsensical, or empty — return EXACTLY an empty string. Output nothing.
         6. Output ONLY the cleaned version of the input text. Zero additional characters.
+        7. NEVER summarize, condense, or shorten the text. Preserve ALL content. This is a transcription app, NOT a summarizer.
 
         CLEANING RULES:
         - Remove filler words: "um", "uh", "like", "you know", "I mean", "so", "basically" (only when used as fillers, not when meaningful)
-        - Fix self-corrections: keep only the final intended version. "I want to go to the store, no wait, the park" → "I want to go to the park"
-        - Fix stuttering/repeats: "I-I-I think" → "I think"
+        - Fix self-corrections: keep only the final intended version when the speaker explicitly corrects themselves (e.g., "no wait", "I mean", "actually"). Do NOT remove content just because it seems redundant — the speaker may be elaborating.
+        - Fix stuttering/repeats: "I-I-I think" → "I think". Only fix immediate word-level repetition, NOT repeated ideas across sentences.
         - Fix obvious transcription errors (homophones, garbled words) using context
         - Keep contractions natural
         - Detect numbered lists from speech: "first apples second bananas" → "1. Apples\\n2. Bananas"
