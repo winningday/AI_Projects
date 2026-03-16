@@ -1,0 +1,24 @@
+## .NET / Visual Studio
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+## NuGet
+**/packages/*
+*.nupkg
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## IDE
+.idea/
+*.swp
+*~

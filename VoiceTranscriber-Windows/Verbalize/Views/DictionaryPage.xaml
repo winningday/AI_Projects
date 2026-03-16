@@ -1,0 +1,80 @@
+<Page x:Class="Verbalize.Views.DictionaryPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{StaticResource BgBrush}">
+
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Custom Dictionary" FontSize="28" FontWeight="Bold"
+                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+        <TextBlock Grid.Row="0" Text="Words sent to Whisper as spelling hints" FontSize="14"
+                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,36,0,16" />
+
+        <!-- Add Word Row -->
+        <Grid Grid.Row="1" Margin="0,8,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="NewWordBox" Style="{StaticResource DarkTextBox}" Grid.Column="0"
+                     KeyDown="NewWordBox_KeyDown" />
+            <Button Content="Add Word" Style="{StaticResource PrimaryButton}" Grid.Column="1"
+                    Margin="8,0,0,0" Click="AddWord_Click" Padding="16,8" FontSize="13" />
+        </Grid>
+
+        <!-- Filter -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <RadioButton x:Name="FilterAll" Content="All" IsChecked="True"
+                         Checked="Filter_Changed" Foreground="{StaticResource TextSecondaryBrush}"
+                         Margin="0,0,16,0" FontSize="13" />
+            <RadioButton x:Name="FilterManual" Content="Manual"
+                         Checked="Filter_Changed" Foreground="{StaticResource TextSecondaryBrush}"
+                         Margin="0,0,16,0" FontSize="13" />
+            <RadioButton x:Name="FilterAuto" Content="Auto-added"
+                         Checked="Filter_Changed" Foreground="{StaticResource TextSecondaryBrush}"
+                         FontSize="13" />
+        </StackPanel>
+
+        <!-- Word List -->
+        <ListBox x:Name="WordList" Grid.Row="3" Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <DockPanel Margin="0,4">
+                        <Button DockPanel.Dock="Right" Content="X" FontSize="11" Padding="6,2"
+                                Click="RemoveWord_Click" Tag="{Binding Word}" Cursor="Hand"
+                                Foreground="{StaticResource ErrorBrush}" Background="Transparent"
+                                BorderThickness="0" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Word}" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="{Binding Source, StringFormat='  ({0})'}" FontSize="12"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       VerticalAlignment="Center" Margin="4,0,0,0" />
+                        </StackPanel>
+                    </DockPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="12,6" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border Background="Transparent" Padding="{TemplateBinding Padding}"
+                                        CornerRadius="4">
+                                    <ContentPresenter />
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
+    </Grid>
+</Page>
