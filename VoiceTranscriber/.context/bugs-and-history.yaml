@@ -1,3 +1,10 @@
+# ---
+# type: reference
+# scope: VoiceTranscriber
+# purpose: Fixed bugs and open issues — check before debugging to avoid re-investigating
+# last_updated: 2026-03-16
+# ---
+
 # Verbalize — Bug History & Fixes
 # Reference for past issues so we don't regress or re-investigate.
 

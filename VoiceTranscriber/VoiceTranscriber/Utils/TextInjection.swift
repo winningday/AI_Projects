@@ -46,6 +46,17 @@ final class TextInjector {
     /// Reads surrounding text from the currently focused text field.
     /// Used to provide context to the LLM for better transcription accuracy.
     static func readContextFromActiveField() -> String? {
+        guard let text = readFullTextFromActiveField() else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count > 200 {
+            return String(trimmed.suffix(200))
+        }
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Reads the FULL text content from the currently focused text field.
+    /// Used by CorrectionTracker to snapshot field state for diff detection.
+    static func readFullTextFromActiveField() -> String? {
         guard let focusedApp = NSWorkspace.shared.frontmostApplication else { return nil }
 
         let appElement = AXUIElementCreateApplication(focusedApp.processIdentifier)
@@ -56,17 +67,11 @@ final class TextInjector {
 
         let element = focusedElement as! AXUIElement
 
-        // Try to read current text value
         var value: AnyObject?
         let valueResult = AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
 
         if valueResult == .success, let text = value as? String {
-            // Return last ~200 chars for context
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.count > 200 {
-                return String(trimmed.suffix(200))
-            }
-            return trimmed.isEmpty ? nil : trimmed
+            return text
         }
 
         return nil
