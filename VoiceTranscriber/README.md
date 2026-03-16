@@ -174,18 +174,29 @@ Window management uses `isReleasedWhenClosed = false` and a custom `WindowDelega
 
 All other functionality uses native frameworks: AVFoundation, AppKit, SwiftUI, Security, Quartz Event Services.
 
-## Upgrading from v1.1
+## Upgrading
 
-Just build and replace — no manual cleanup needed. On first launch, v1.2 automatically:
-
-1. **Migrates API keys** from the old Keychain (com.verbalize.apikeys) to UserDefaults
-2. **Deletes old Keychain entries** so you never see a password prompt
-3. **Preserves all settings**, transcript history, dictionary, and style profiles
+To upgrade Verbalize to a new version, just build and replace — no uninstall needed:
 
 ```bash
-./build.sh release
-# Replace /Applications/Verbalize.app with the new build
+# 1. Quit Verbalize (click menu bar icon → Quit)
+# 2. Build the new version
+./build.sh release --dmg
+
+# 3. Open the DMG
+open .build/release/Verbalize-1.2.0.dmg
+
+# 4. Drag Verbalize.app to /Applications and click Replace when prompted
+# 5. Eject the DMG and launch Verbalize
 ```
+
+Or without a DMG:
+```bash
+./build.sh release
+# Follow the prompt to copy to /Applications (replaces the old version)
+```
+
+All your settings, API keys, transcript history, dictionary, and style profiles are preserved automatically. If upgrading from v1.1, API keys are migrated from Keychain to UserDefaults on first launch.
 
 ## Clean Uninstall
 

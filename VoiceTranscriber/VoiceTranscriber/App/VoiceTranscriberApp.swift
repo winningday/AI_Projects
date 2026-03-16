@@ -37,6 +37,7 @@ final class AppState: ObservableObject {
     @Published var statusMessage: String = "Ready"
     @Published var selectedTab: AppTab = .home
     @Published var totalWordsTranscribed: Int = 0
+    var hasLaunched = false
     @Published var totalRecordingSeconds: Double = 0
 
     let audioRecorder = AudioRecorder()
@@ -382,6 +383,9 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func appDidFinishLaunching() {
+        guard !hasLaunched else { return }
+        hasLaunched = true
+
         if !config.hasCompletedOnboarding {
             showOnboardingWindow()
         } else {
@@ -456,15 +460,33 @@ struct VerbalizeApp: App {
     @StateObject private var appState = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {}
+
     var body: some Scene {
         // Menu bar icon (always present)
         MenuBarExtra {
             MenuBarView(appState: appState)
+                .onAppear {
+                    // Trigger launch logic on first menu bar appearance
+                    // (also handles the case where AppDelegate fires before appState is ready)
+                    if !appState.hasLaunched {
+                        appState.appDidFinishLaunching()
+                    }
+                }
         } label: {
             Label {
                 Text("Verbalize")
             } icon: {
                 Image(systemName: menuBarIcon)
+            }
+            .onAppear {
+                // The label's onAppear fires at app launch (unlike the content's onAppear
+                // which only fires when the user clicks the menu bar icon)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !appState.hasLaunched {
+                        appState.appDidFinishLaunching()
+                    }
+                }
             }
         }
         .menuBarExtraStyle(.window)
