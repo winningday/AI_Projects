@@ -1,0 +1,63 @@
+name: VoiceTranscriberIOS
+options:
+  bundleIdPrefix: com.verbalize
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    from: "6.24.0"
+
+targets:
+  VoiceTranscriberIOS:
+    type: application
+    platform: iOS
+    sources:
+      - VoiceTranscriberIOS
+      - Shared
+    resources:
+      - Resources
+    settings:
+      base:
+        INFOPLIST_FILE: VoiceTranscriberIOS/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.verbalize.ios
+        CODE_SIGN_ENTITLEMENTS: VoiceTranscriberIOS/VoiceTranscriberIOS.entitlements
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+    dependencies:
+      - package: GRDB
+      - target: VerbalizeKeyboard
+    entitlements:
+      path: VoiceTranscriberIOS/VoiceTranscriberIOS.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.verbalize.ios
+
+  VerbalizeKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - VerbalizeKeyboard
+      - Shared
+    settings:
+      base:
+        INFOPLIST_FILE: VerbalizeKeyboard/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.verbalize.ios.keyboard
+        CODE_SIGN_ENTITLEMENTS: VerbalizeKeyboard/VerbalizeKeyboard.entitlements
+        SKIP_INSTALL: true
+    dependencies:
+      - package: GRDB
+    entitlements:
+      path: VerbalizeKeyboard/VerbalizeKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.verbalize.ios
