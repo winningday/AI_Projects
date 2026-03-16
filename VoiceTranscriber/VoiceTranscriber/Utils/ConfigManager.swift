@@ -74,7 +74,7 @@ enum StyleTone: String, CaseIterable, Codable, Identifiable {
         case .casual:
             return "Use proper capitalization but minimal punctuation. Skip periods at the end of short messages. Keep contractions."
         case .veryCasual:
-            return "Use all lowercase. Minimal punctuation. Skip periods. Keep it brief and natural, like texting."
+            return "Use all lowercase. Minimal punctuation. Skip periods. Keep it natural, like texting. Do NOT shorten or remove content."
         case .excited:
             return "Use proper capitalization. Add exclamation marks for emphasis. Keep energy high."
         }
