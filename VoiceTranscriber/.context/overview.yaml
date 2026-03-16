@@ -59,6 +59,10 @@ file_map:
     OnboardingView.swift: First-launch setup wizard (permissions + API keys)
     RecordingWindow.swift: Floating waveform overlay during recording
     SettingsView.swift: Legacy settings (not actively used)
+  Resources/:
+    MenuBarIcon@1x.png: Menu bar template icon 22x22 (white silhouette on transparent, macOS auto-tints)
+    MenuBarIcon@2x.png: Menu bar template icon 44x44 (Retina)
+    MenuBarIcon@3x.png: Menu bar template icon 66x66
   Utils/:
     ConfigManager.swift: All settings, UserDefaults API keys (base64 obfuscated), Keychain migration, dictionary, style profiles, translation config
     TextInjection.swift: AX API / clipboard text injection into active field
@@ -76,6 +80,7 @@ features:
   - Productivity dashboard (voice WPM vs typing speed comparison, weekly chart)
   - Configurable typing speed for accurate time-saved calculations
   - Menu bar app with main window
+  - Custom branded menu bar icon (template image, auto light/dark mode)
 
 known_issues:
   - Cannot test builds on dev server (no Swift compiler)
