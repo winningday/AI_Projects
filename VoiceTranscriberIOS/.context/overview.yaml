@@ -1,0 +1,76 @@
+---
+type: context
+scope: VoiceTranscriberIOS
+purpose: File map and architecture overview
+last_updated: 2026-03-16
+---
+
+project: VoiceTranscriberIOS
+display_name: Verbalize for iOS
+version: "1.0.0"
+min_ios: "16.0"
+bundle_id: com.verbalize.ios
+
+# Shared code (used by both app and keyboard extension)
+shared:
+  api:
+    WhisperClient.swift: OpenAI Whisper transcription with gpt-4o-mini-transcribe + whisper-1 fallback
+    ClaudeClient.swift: Claude Haiku text cleanup with dictionary, style, corrections, translation
+  config:
+    SharedConfig.swift: App Group UserDefaults singleton — API keys, dictionary, corrections, settings
+  database:
+    TranscriptDatabase.swift: GRDB SQLite in App Group container — transcript CRUD + search
+  models:
+    Transcript.swift: Transcript data model (id, timestamp, original, cleaned, corrected, duration)
+    StyleModels.swift: StyleContext, StyleTone, DictionaryEntry, WordCorrection
+  utils:
+    AudioRecorderIOS.swift: AVAudioEngine recorder (16kHz mono) + AudioLevelMonitor
+    CorrectionTracker.swift: Word-level diff detection for self-learning corrections
+
+# Main iOS app
+app:
+  entry:
+    VoiceTranscriberIOSApp.swift: "@main entry, AppState orchestrator, ContentView root"
+  views:
+    MainTabView.swift: TabView with Home, History, Stats, Dictionary, Settings
+    HomeView.swift: Dashboard — status, record button, last transcript, today stats
+    TranscriptHistoryView.swift: Searchable list of all transcriptions
+    StatsView.swift: Productivity dashboard — WPM, words, time saved, weekly chart
+    DictionaryView.swift: Custom word management with manual + auto-added filter
+    SettingsView.swift: API keys, translation, style, features, keyboard setup
+    OnboardingView.swift: 4-step setup wizard (welcome, mic, API keys, keyboard)
+
+# Keyboard extension
+keyboard:
+  KeyboardViewController.swift: UIInputViewController — recording, transcription, text insertion, correction tracking
+  KeyboardView.swift: SwiftUI QWERTY keyboard with mic button, number/symbol pages, globe key
+
+# Configuration
+config_files:
+  project.yml: XcodeGen project spec (2 targets — app + keyboard extension)
+  Package.swift: SPM package for GRDB dependency
+  Info.plist: App and keyboard extension plists
+  entitlements: App Group entitlements for both targets
+
+# Data flow
+pipeline:
+  - User taps mic button on keyboard
+  - AudioRecorderIOS records via AVAudioEngine (16kHz mono m4a)
+  - WhisperClient sends audio to OpenAI (gpt-4o-mini-transcribe)
+  - ClaudeClient cleans text (haiku-4-5 with dictionary + style + corrections)
+  - KeyboardViewController inserts text via textDocumentProxy
+  - CorrectionTracker monitors textDidChange for user edits
+  - Corrections stored in SharedConfig → fed to future Claude prompts
+
+# Sharing mechanism
+app_group:
+  identifier: group.com.verbalize.ios
+  shared_via_user_defaults:
+    - API keys (base64 obfuscated)
+    - Dictionary entries
+    - Word corrections
+    - Style profiles
+    - Translation settings
+    - Feature toggles
+  shared_via_sqlite:
+    - Transcript history (in App Group container)
