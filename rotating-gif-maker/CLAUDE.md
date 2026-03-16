@@ -1,3 +1,11 @@
+---
+type: config
+scope: rotating-gif-maker
+purpose: Project docs, setup, and slash command reference for rotating GIF tool
+status: complete
+last_updated: 2026-03-16
+---
+
 # Rotating GIF Maker
 
 Turns any image into a smooth animated rotating GIF. Great for email signatures,

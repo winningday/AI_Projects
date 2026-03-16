@@ -1,3 +1,10 @@
+# ---
+# type: context
+# scope: VoiceTranscriber
+# purpose: Project overview, tech stack, and file map — READ THIS FIRST before any code
+# last_updated: 2026-03-16
+# ---
+
 # Verbalize — Project Overview
 # Read this FIRST before touching any code. Points you to the right files.
 
