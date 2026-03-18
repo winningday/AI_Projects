@@ -189,16 +189,17 @@ class KeyboardViewController: UIInputViewController {
 
         // Capture context from text field before processing
         let contextText = readContextFromProxy()
+        let inputContext = detectInputContext()
 
         Task { @MainActor in
-            await processRecording(url: result.url, duration: result.duration, contextText: contextText)
+            await processRecording(url: result.url, duration: result.duration, contextText: contextText, inputContext: inputContext)
         }
     }
 
     // MARK: - Processing Pipeline
 
     @MainActor
-    private func processRecording(url: URL, duration: TimeInterval, contextText: String?) async {
+    private func processRecording(url: URL, duration: TimeInterval, contextText: String?, inputContext: String? = nil) async {
         defer {
             audioRecorder.cleanupTempFile(url: url)
         }
@@ -230,7 +231,8 @@ class KeyboardViewController: UIInputViewController {
                 smartFormatting: config.smartFormatting,
                 translationEnabled: config.translationEnabled,
                 targetLanguage: config.targetLanguage,
-                recentCorrections: config.recentCorrections
+                recentCorrections: config.recentCorrections,
+                inputContextHint: inputContext
             )
 
             // Step 3: Insert text into the active field
@@ -310,6 +312,50 @@ class KeyboardViewController: UIInputViewController {
 
         // Only return if the text actually changed
         return editedText != insertedText ? editedText : nil
+    }
+
+    // MARK: - Input Context Detection
+
+    /// Detects the type of text field from keyboardType and textContentType,
+    /// providing a hint to Claude about how to format the output.
+    /// This is the iOS equivalent of the macOS "active app" detection.
+    private func detectInputContext() -> String? {
+        let proxy = textDocumentProxy
+
+        // Check textContentType first (more specific)
+        if let contentType = proxy.textContentType {
+            switch contentType {
+            case .emailAddress:
+                return "Email address field — output should be a valid email address."
+            case .URL:
+                return "URL field — output should be a properly formatted URL."
+            case .telephoneNumber:
+                return "Phone number field — output should be a phone number."
+            case .fullStreetAddress, .streetAddressLine1, .streetAddressLine2,
+                 .city, .addressState, .postalCode, .countryName:
+                return "Address field — output should be a properly formatted address component."
+            case .name, .givenName, .familyName, .namePrefix, .nameSuffix, .middleName:
+                return "Name field — output should be a person's name, properly capitalized."
+            case .organizationName:
+                return "Organization name field — output should be a company or organization name."
+            case .jobTitle:
+                return "Job title field — output should be a professional title."
+            default:
+                break
+            }
+        }
+
+        // Fall back to keyboardType
+        switch proxy.keyboardType ?? .default {
+        case .emailAddress:
+            return "This appears to be an email field — use proper email formatting."
+        case .URL, .webSearch:
+            return "This appears to be a URL or search field — format accordingly."
+        case .numberPad, .phonePad, .decimalPad, .numbersAndPunctuation:
+            return "This is a numeric input field."
+        default:
+            return nil
+        }
     }
 
     // MARK: - Text Proxy Helpers

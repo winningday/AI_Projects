@@ -20,7 +20,8 @@ final class ClaudeClient {
         smartFormatting: Bool = true,
         translationEnabled: Bool = false,
         targetLanguage: String = "en",
-        recentCorrections: [WordCorrection] = []
+        recentCorrections: [WordCorrection] = [],
+        inputContextHint: String? = nil
     ) async throws -> String {
         guard let apiKey = SharedConfig.shared.claudeAPIKey, !apiKey.isEmpty else {
             throw ClaudeError.missingAPIKey
@@ -41,7 +42,8 @@ final class ClaudeClient {
             smartFormatting: smartFormatting,
             translationEnabled: translationEnabled,
             targetLanguage: targetLanguage,
-            recentCorrections: recentCorrections
+            recentCorrections: recentCorrections,
+            inputContextHint: inputContextHint
         )
 
         let requestBody = ClaudeRequestWithSystem(
@@ -91,7 +93,8 @@ final class ClaudeClient {
         smartFormatting: Bool,
         translationEnabled: Bool,
         targetLanguage: String,
-        recentCorrections: [WordCorrection]
+        recentCorrections: [WordCorrection],
+        inputContextHint: String? = nil
     ) -> String {
         var prompt = """
         You are a transcript cleaner. You receive raw transcripts of spoken audio recorded from a microphone and you clean them up. That is your only task. You output the cleaned transcript and nothing else.
@@ -162,6 +165,11 @@ final class ClaudeClient {
             - URLs, file paths, and technical terms should be formatted correctly
             - Code snippets should be on their own lines
             """
+        }
+
+        // Input context (detected from keyboard type / text content type)
+        if let hint = inputContextHint, !hint.isEmpty {
+            prompt += "\n\nINPUT CONTEXT: \(hint)"
         }
 
         if let context = contextText, !context.isEmpty {
