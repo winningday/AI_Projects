@@ -44,4 +44,13 @@ public static class StyleToneExtensions
         StyleTone.Excited => "Oh absolutely! I'd LOVE to help with that!",
         _ => ""
     };
+
+    public static string PromptInstructions(this StyleTone tone) => tone switch
+    {
+        StyleTone.Formal => "Use proper capitalization, full punctuation, and complete sentences. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.",
+        StyleTone.Casual => "Use proper capitalization but minimal punctuation. Skip periods at the end of short messages. Keep contractions. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.",
+        StyleTone.VeryCasual => "Use all lowercase. Minimal punctuation. Skip periods. Keep it natural, like texting. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize, condense, or shorten.",
+        StyleTone.Excited => "Use proper capitalization. Add exclamation marks for emphasis. Keep energy high. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.",
+        _ => ""
+    };
 }

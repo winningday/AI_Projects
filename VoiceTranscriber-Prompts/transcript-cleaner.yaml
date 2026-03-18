@@ -2,8 +2,8 @@
 type: prompt-definition
 scope: VoiceTranscriber (all platforms)
 purpose: Single source of truth for the Claude transcript-cleaning system prompt
-version: 2
-last_updated: 2026-03-16
+version: 3
+last_updated: 2026-03-18
 ---
 
 # Transcript Cleaner — System Prompt Definition
@@ -12,20 +12,31 @@ last_updated: 2026-03-16
 # used by all VoiceTranscriber platforms (macOS, Windows, iOS).
 #
 # HOW TO USE:
-#   1. Edit prompts HERE, not in platform code.
+#   1. Edit prompt text HERE, not in platform code.
 #   2. Each platform's ClaudeClient assembles its system prompt by
-#      reading these sections in order and appending the relevant
-#      optional sections based on user settings.
-#   3. When you change this file, update ALL three ClaudeClient files
-#      to match, or (better) have each platform load this file at
-#      build time / bundle time.
+#      concatenating the static sections below, then appending
+#      dynamic sections populated from user settings at runtime.
+#   3. When you change this file, update ALL three ClaudeClient files:
+#      - VoiceTranscriber/VoiceTranscriber/API/ClaudeClient.swift (macOS)
+#      - VoiceTranscriber-Windows/Verbalize/Services/ClaudeClient.cs (Windows)
+#      - VoiceTranscriberIOS/Shared/API/ClaudeClient.swift (iOS)
 #
-# SECTIONS are concatenated in this order:
-#   base → cleaning_rules → garbled_input → output_format
-#   then conditionally: translation, style, dictionary, corrections,
-#   smart_formatting, active_app, context
+# PROMPT ASSEMBLY ORDER:
+#   1. base (always)
+#   2. cleaning_rules (always)
+#   3. garbled_input (always)
+#   4. output_format (always)
+#   5. translation — if user has translation enabled (from Settings)
+#   6. style — always; text comes from StyleTone enum (from Settings)
+#   7. dictionary — if user has custom words (from Settings)
+#   8. corrections — if user has recent corrections (auto-tracked)
+#   9. smart_formatting — if user has it enabled (from Settings)
+#  10. active_app — if context awareness is on (from Settings); app detection is runtime
+#  11. context — if there's existing text in the target field (runtime)
 
-# ─── REQUIRED SECTIONS (always included) ───────────────────────────
+# ═══════════════════════════════════════════════════════════════════
+# STATIC SECTIONS — identical across all platforms
+# ═══════════════════════════════════════════════════════════════════
 
 base: |
   You are a transcript cleaner. You receive raw transcripts of spoken audio recorded from a microphone and you clean them up. That is your only task. You output the cleaned transcript and nothing else.
@@ -51,8 +62,20 @@ garbled_input: |
 output_format: |
   OUTPUT FORMAT: Output only the cleaned transcript text. Nothing before it, nothing after it. No quotes, no labels, no prefixes like "Here is the cleaned text:". Just the cleaned words. If the input was unusable, output nothing at all (empty response).
 
-# ─── OPTIONAL SECTIONS (appended based on user settings) ───────────
+# ═══════════════════════════════════════════════════════════════════
+# DYNAMIC SECTION TEMPLATES — text wrappers only
+#
+# These sections use {placeholders} that each platform fills at
+# runtime from user settings. The actual values (which style,
+# which words, which language, which app) are NEVER hardcoded here.
+# They live in each platform's settings/config system:
+#   - macOS: ConfigManager (UserDefaults) + StyleTone enum
+#   - Windows: ConfigManager (settings.json) + StyleTone enum
+#   - iOS: SharedConfig (UserDefaults/AppGroup) + StyleTone enum
+# ═══════════════════════════════════════════════════════════════════
 
+# Appended when: user has translation enabled in Settings
+# {language_name} and {language_code} come from the user's selected target language
 translation_template: |
   TRANSLATION MODE (ENABLED):
   - Auto-detect the language of the input speech.
@@ -62,39 +85,38 @@ translation_template: |
   - Apply all cleaning rules FIRST, then translate.
   - If the input is already in {language_name}, just clean it without translation.
 
-styles:
-  formal: |
-    Use proper capitalization, full punctuation, and complete sentences. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.
-  casual: |
-    Use proper capitalization but minimal punctuation. Skip periods at the end of short messages. Keep contractions. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.
-  very_casual: |
-    Use all lowercase. Minimal punctuation. Skip periods. Keep it natural, like texting. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize, condense, or shorten.
-  excited: |
-    Use proper capitalization. Add exclamation marks for emphasis. Keep energy high. Preserve ALL content — every sentence and idea from the input must appear in the output. Do not summarize or condense.
+# Appended always, prefixed with "STYLE: "
+# {style_instructions} comes from StyleTone.promptInstructions (defined in each platform's enum)
+style_template: "STYLE: {style_instructions}"
 
+# Appended when: user has custom dictionary words in Settings
+# {words} is a comma-separated list of the user's dictionary entries (max 50)
 dictionary_template: |
   CUSTOM DICTIONARY (use these exact spellings when you hear these words or similar-sounding words):
   {words}
 
+# Appended when: user has recent corrections (auto-tracked by CorrectionTracker)
+# {correction_lines} are "original" → "corrected" pairs (max 20)
 corrections_template: |
   PAST CORRECTIONS (the user previously corrected these words — apply the same corrections when you see these words):
   {correction_lines}
 
+# Appended when: user has smart formatting enabled in Settings
 smart_formatting: |
   SMART FORMATTING:
   - If the user appears to be dictating code or technical content (function names, variable names, class names), preserve technical formatting: camelCase, snake_case, PascalCase as appropriate
   - URLs, file paths, and technical terms should be formatted correctly
   - Code snippets should be on their own lines
 
+# Appended when: context awareness is enabled AND an active app is detected
+# {app_name} is the frontmost app name detected at runtime
+# The app-specific hint (work messenger, email, code editor, etc.) is determined
+# by runtime logic in each platform's ClaudeClient — not hardcoded here
 active_app_template: |
   ACTIVE APP: The user is typing in "{app_name}". Adjust tone appropriately.
 
-active_app_hints:
-  work_messenger: "This is a work messenger — keep it professional but concise."
-  personal_messenger: "This is a personal messenger — keep it natural and conversational."
-  email: "This is email — use proper email formatting."
-  code_editor: "This is a code editor — preserve technical terms, function names, and code formatting precisely."
-
+# Appended when: there is existing text in the target text field
+# {context_text} is the text already present in the field
 context_template: |
   CONTEXT (text already in the field — use for spelling names and understanding topic):
   "{context_text}"
