@@ -1,0 +1,306 @@
+---
+type: architecture
+scope: VoiceTranscriberIOS
+purpose: Cloud sync and user authentication system design — cross-platform settings sync
+last_updated: 2026-03-18
+---
+
+# Cloud Sync & User Auth — Design Document
+
+## Goals
+- Sync settings, dictionaries, corrections, and transcript history across macOS, iOS, and Windows
+- Simple custom auth (email/password) now, migratable to Google OAuth later
+- Freemium-ready: free tier must cost near-zero to operate
+- No vendor lock-in: portable backend, standard protocols
+- Single-user priority now, multi-user scalable later
+
+## User Requirements
+- User switches between macOS, iOS, and Windows daily
+- Settings (tone, language, formatting) must stay consistent
+- Dictionary words and correction history must sync so self-learning works everywhere
+- Transcript history should be accessible from any device
+- API keys should NOT sync (security risk — stay local per device)
+
+## What Gets Synced
+
+syncable_data:
+  settings:
+    - defaultStyleTone
+    - styleProfiles (per-context tone mappings)
+    - smartFormatting
+    - translationEnabled
+    - targetLanguage
+    - autoAddToDictionary
+    - playSoundEffects
+    - typingSpeed
+    sync_strategy: full-replace-on-change  # Small payload, last-write-wins
+    priority: high
+
+  dictionary:
+    - word
+    - autoAdded
+    - dateAdded
+    sync_strategy: merge-by-id  # UUID-keyed, union of all devices
+    priority: high
+
+  corrections:
+    - original
+    - corrected
+    - date
+    sync_strategy: append-deduplicate  # Append new, deduplicate by (original, corrected) pair
+    max_entries: 200
+    priority: high
+
+  transcripts:
+    - originalText
+    - cleanedText
+    - correctedText
+    - durationSeconds
+    - timestamp
+    - deviceSource (new field — which device created it)
+    sync_strategy: append-only  # Never modify, paginated fetch
+    priority: medium
+
+  not_synced:
+    - API keys (security — stay local)
+    - hasCompletedOnboarding (per-device)
+    - privacyMode (per-device preference)
+    - hotkeyKeyCode / hotkeyModifiers (macOS only)
+    - launchAtLogin (per-device)
+    - contextAwareness (macOS only)
+    - autoInjectText (macOS only)
+
+## Authentication Design
+
+### Phase 1: Custom Auth (Current Plan)
+- Email + password registration/login
+- Password hashed with bcrypt server-side
+- JWT access tokens (short-lived, 1 hour)
+- Refresh tokens (long-lived, 30 days, stored in Keychain/credential store)
+- Simple REST endpoints: POST /auth/register, POST /auth/login, POST /auth/refresh, POST /auth/logout
+
+### Phase 2: Add OAuth Providers (Future)
+- Add Google Sign-In alongside custom auth
+- Same JWT system — OAuth just becomes another way to get a token
+- Migration path: link existing email account to Google account
+- Apple Sign-In for App Store compliance (required if any social login offered)
+
+### Why Custom First
+- Simpler to implement (no SDK dependencies per platform)
+- Works identically on macOS, iOS, Windows (just HTTP calls)
+- Full control over user data and auth flow
+- OAuth can be layered on top without breaking changes
+
+## Backend Options (Evaluated)
+
+### Option A: Supabase (Managed Postgres + Auth)
+- pros: Built-in auth, RLS, realtime, generous free tier (500MB, 50k MAU)
+- cons: Vendor dependency (though open-source, self-hostable)
+- cost_free: $0/mo (free tier)
+- cost_paid: $25/mo (Pro)
+- portability: High — standard Postgres, can self-host Supabase
+- verdict: Good but overkill for phase 1, auth system is opinionated
+
+### Option B: Self-hosted API + SQLite/Postgres
+- pros: Full control, no vendor lock-in, cheapest at scale
+- cons: Must build auth, API, deployment yourself
+- cost: $5-7/mo (Fly.io, Railway, Hetzner)
+- portability: Maximum
+- verdict: Most flexible, more initial work
+
+### Option C: Cloudflare Workers + D1
+- pros: SQLite-based, extremely cheap, edge-deployed, fast
+- cons: No built-in auth, newer platform, some limitations
+- cost_free: $0/mo (free tier: 5GB D1, 100k worker requests/day)
+- cost_paid: $5/mo (Workers Paid: 10M requests, 5GB D1)
+- portability: Medium — D1 is SQLite, Workers are standard JS
+- verdict: Best cost profile for freemium
+
+### Recommended: Option C (Cloudflare Workers + D1)
+reasons:
+  - SQLite-compatible (matches existing GRDB/SQLite local storage)
+  - Free tier is extremely generous for a single user
+  - Pay-per-use scales perfectly with freemium (free users cost near-zero)
+  - Edge-deployed = fast from anywhere
+  - Custom auth is simple to build in Workers (JWT + bcrypt)
+  - D1 databases are exportable SQLite files (no lock-in)
+  - Can migrate to self-hosted if needed (it's just SQLite + HTTP)
+
+## Proposed API Schema (REST)
+
+endpoints:
+  auth:
+    - POST /api/auth/register     # email, password → JWT + refresh token
+    - POST /api/auth/login        # email, password → JWT + refresh token
+    - POST /api/auth/refresh      # refresh_token → new JWT
+    - POST /api/auth/logout       # invalidate refresh token
+    - GET  /api/auth/me           # current user info
+
+  sync:
+    - GET    /api/sync/settings          # fetch user settings
+    - PUT    /api/sync/settings          # update user settings (full replace)
+    - GET    /api/sync/dictionary        # fetch all dictionary entries
+    - POST   /api/sync/dictionary        # upsert dictionary entries (batch)
+    - DELETE /api/sync/dictionary/:id    # remove entry
+    - GET    /api/sync/corrections       # fetch corrections (paginated)
+    - POST   /api/sync/corrections       # append new corrections (batch)
+    - GET    /api/sync/transcripts       # fetch transcripts (paginated, since timestamp)
+    - POST   /api/sync/transcripts       # upload new transcripts (batch)
+
+## Database Schema (D1 / SQLite)
+
+tables:
+  users:
+    - id: TEXT PRIMARY KEY (UUID)
+    - email: TEXT UNIQUE NOT NULL
+    - password_hash: TEXT NOT NULL
+    - created_at: DATETIME
+    - updated_at: DATETIME
+    - tier: TEXT DEFAULT 'free'  # free, pro, premium (future)
+
+  refresh_tokens:
+    - id: TEXT PRIMARY KEY
+    - user_id: TEXT REFERENCES users(id)
+    - token_hash: TEXT NOT NULL
+    - expires_at: DATETIME
+    - created_at: DATETIME
+
+  user_settings:
+    - user_id: TEXT PRIMARY KEY REFERENCES users(id)
+    - settings_json: TEXT  # JSON blob of all syncable settings
+    - updated_at: DATETIME
+
+  dictionary_entries:
+    - id: TEXT PRIMARY KEY (UUID, same as local)
+    - user_id: TEXT REFERENCES users(id)
+    - word: TEXT NOT NULL
+    - auto_added: BOOLEAN DEFAULT FALSE
+    - date_added: DATETIME
+    - deleted: BOOLEAN DEFAULT FALSE  # soft delete for sync
+
+  corrections:
+    - id: TEXT PRIMARY KEY (UUID, same as local)
+    - user_id: TEXT REFERENCES users(id)
+    - original: TEXT NOT NULL
+    - corrected: TEXT NOT NULL
+    - date: DATETIME
+
+  transcripts:
+    - id: TEXT PRIMARY KEY (UUID, same as local)
+    - user_id: TEXT REFERENCES users(id)
+    - original_text: TEXT
+    - cleaned_text: TEXT
+    - corrected_text: TEXT
+    - duration_seconds: REAL
+    - device_source: TEXT  # "macos", "ios", "windows"
+    - timestamp: DATETIME
+
+## Sync Architecture
+
+sync_flow:
+  on_app_launch:
+    1: Authenticate (refresh JWT if expired)
+    2: Pull settings (GET /sync/settings) → merge with local
+    3: Pull new dictionary entries since last sync
+    4: Pull new corrections since last sync
+    5: Push any local-only changes
+
+  on_change:
+    - Settings change → immediate PUT /sync/settings
+    - New dictionary word → immediate POST /sync/dictionary
+    - New correction → batch POST /sync/corrections (debounced 5s)
+    - New transcript → POST /sync/transcripts (debounced 10s)
+
+  conflict_resolution:
+    settings: last-write-wins (server timestamp)
+    dictionary: union-merge (keep all, deduplicate by word)
+    corrections: append-only (no conflicts possible)
+    transcripts: append-only (no conflicts possible)
+
+  offline_support:
+    - All operations work offline (local-first)
+    - Queue changes when offline
+    - Sync queue on reconnect
+    - Local database is always the source of truth for the current device
+
+## Client-Side Changes Required
+
+ios_changes:
+  new_files:
+    - Shared/API/SyncClient.swift       # REST client for sync API
+    - Shared/API/AuthClient.swift       # Login/register/token management
+    - Shared/Sync/SyncManager.swift     # Orchestrates sync on launch + changes
+    - Shared/Sync/SyncQueue.swift       # Offline queue for pending changes
+    - VoiceTranscriberIOS/Views/Auth/LoginView.swift
+    - VoiceTranscriberIOS/Views/Auth/RegisterView.swift
+  modified_files:
+    - Shared/Config/SharedConfig.swift  # Add sync triggers on setting changes
+    - Shared/Database/TranscriptDatabase.swift  # Add deviceSource column
+    - Shared/Models/Transcript.swift    # Add deviceSource field
+    - VoiceTranscriberIOS/VoiceTranscriberIOSApp.swift  # Auth gate + sync on launch
+
+macos_changes:
+  new_files:
+    - VoiceTranscriber/API/SyncClient.swift
+    - VoiceTranscriber/API/AuthClient.swift
+    - VoiceTranscriber/Sync/SyncManager.swift
+    - VoiceTranscriber/Sync/SyncQueue.swift
+    - VoiceTranscriber/Views/Auth/LoginView.swift
+    - VoiceTranscriber/Views/Auth/RegisterView.swift
+  modified_files:
+    - VoiceTranscriber/Config/ConfigManager.swift  # Add sync triggers
+    - VoiceTranscriber/Database/TranscriptDatabase.swift
+    - VoiceTranscriber/Models/Transcript.swift
+
+backend:
+  new_files:
+    - VoiceTranscriberAPI/              # New project folder
+    - VoiceTranscriberAPI/src/index.ts  # Cloudflare Worker entry
+    - VoiceTranscriberAPI/src/auth.ts   # Auth endpoints + JWT
+    - VoiceTranscriberAPI/src/sync.ts   # Sync endpoints
+    - VoiceTranscriberAPI/src/db.ts     # D1 database helpers
+    - VoiceTranscriberAPI/schema.sql    # D1 schema
+    - VoiceTranscriberAPI/wrangler.toml # Cloudflare config
+    - VoiceTranscriberAPI/package.json
+
+## Implementation Order
+
+phases:
+  phase_1_backend:
+    description: Build the sync API
+    tasks:
+      - Set up Cloudflare Worker project
+      - Create D1 database and schema
+      - Implement auth endpoints (register, login, refresh, logout)
+      - Implement sync endpoints (settings, dictionary, corrections, transcripts)
+      - Add JWT middleware
+      - Deploy and test with curl
+
+  phase_2_ios:
+    description: Add auth + sync to iOS app
+    tasks:
+      - Build AuthClient and SyncClient
+      - Build LoginView and RegisterView
+      - Build SyncManager with sync-on-launch
+      - Add sync triggers to SharedConfig
+      - Add deviceSource to transcripts
+      - Test end-to-end
+
+  phase_3_macos:
+    description: Add auth + sync to macOS app
+    tasks:
+      - Port AuthClient and SyncClient (share most code)
+      - Build login UI for macOS
+      - Add SyncManager
+      - Add sync triggers to ConfigManager
+      - Test cross-device sync (iOS ↔ macOS)
+
+  phase_4_polish:
+    description: Production readiness
+    tasks:
+      - Add offline queue and retry logic
+      - Add sync status indicator in UI
+      - Add "last synced" timestamp display
+      - Rate limiting on API
+      - Add account deletion endpoint (GDPR)
+      - Freemium tier enforcement (future)

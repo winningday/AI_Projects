@@ -2,8 +2,29 @@
 type: memory-log
 scope: VoiceTranscriberIOS
 purpose: Persistent session memory for Claude Code
-last_updated: 2026-03-16
+last_updated: 2026-03-18
 ---
+
+## 2026-03-18 — KeyboardType Context + Cloud Sync Planning
+
+- **What:** Added keyboardType/textContentType detection so Claude gets input context hints (email field, URL field, name field, etc.). Also documented full cloud sync + user auth feature plan.
+- **Files:**
+  - Modified: `VerbalizeKeyboard/KeyboardViewController.swift` — added `detectInputContext()` method
+  - Modified: `Shared/API/ClaudeClient.swift` — added `inputContextHint` parameter to `cleanTranscription()` and `buildSystemPrompt()`
+  - Created: `.context/cloud-sync-plan.yaml` — comprehensive cloud sync architecture
+  - Updated: `TODO.md` — reorganized backlog, added cloud sync phases
+- **Decisions:**
+  - Cloud sync will use Cloudflare Workers + D1 (SQLite-based, free tier generous, no vendor lock-in)
+  - Custom email/password auth first (JWT + bcrypt), Google/Apple OAuth layered on later
+  - API keys will NOT sync (security — stay local per device)
+  - Sync strategy: settings = last-write-wins, dictionary = union-merge, corrections/transcripts = append-only
+  - Local-first architecture: app works offline, queues changes, syncs on reconnect
+  - Backend will be a new project folder: `VoiceTranscriberAPI/`
+- **Gotchas:**
+  - `textDocumentProxy.keyboardType` returns optional on some iOS versions — defaulting to `.default`
+  - `textContentType` is more specific than `keyboardType` — check it first
+  - Self-learning correction tracking is already fully wired: CorrectionTracker → SharedConfig.corrections → Claude "PAST CORRECTIONS" prompt section
+- **Next:** Build the Cloudflare Workers backend (Phase 1), then wire up iOS client (Phase 2)
 
 ## 2026-03-16 — Initial iOS Port from macOS VoiceTranscriber
 
