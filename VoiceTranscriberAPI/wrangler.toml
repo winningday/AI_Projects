@@ -1,0 +1,18 @@
+name = "verbalize-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-20"
+
+# D1 Database binding
+# After creating the database with `wrangler d1 create verbalize-db`,
+# replace the database_id below with the actual ID from the output.
+[[d1_databases]]
+binding = "DB"
+database_name = "verbalize-db"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+# JWT secret for signing tokens
+# Set via: wrangler secret put JWT_SECRET
+# Generate one with: openssl rand -base64 32
+
+[vars]
+ENVIRONMENT = "production"
