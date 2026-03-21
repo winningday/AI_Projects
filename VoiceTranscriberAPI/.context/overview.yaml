@@ -1,0 +1,47 @@
+---
+type: context
+scope: VoiceTranscriberAPI
+purpose: File map and architecture overview
+last_updated: 2026-03-18
+---
+
+project: VoiceTranscriberAPI
+description: Cloudflare Workers + D1 backend for Verbalize cross-device sync
+
+tech_stack:
+  runtime: Cloudflare Workers
+  database: Cloudflare D1 (SQLite)
+  framework: Hono
+  language: TypeScript
+  auth: Custom JWT + PBKDF2
+
+files:
+  src/index.ts: Worker entry point — Hono router, CORS, JWT middleware, error handler
+  src/auth.ts: Auth endpoints — register, login, refresh, logout
+  src/sync.ts: Sync endpoints — settings, dictionary, corrections, transcripts
+  src/crypto.ts: Crypto helpers — PBKDF2 password hashing, JWT sign/verify (Web Crypto API)
+  src/types.ts: Shared TypeScript interfaces (Env, payloads, JWT)
+  schema.sql: D1 database schema (6 tables, indexes)
+  wrangler.toml: Cloudflare Worker configuration + D1 binding
+  package.json: Dependencies (hono, wrangler, workers-types)
+  tsconfig.json: TypeScript config (strict, ES2022, bundler resolution)
+
+database_tables:
+  users: User accounts (id, email, password_hash, tier)
+  refresh_tokens: Opaque refresh tokens (hashed, per-session)
+  user_settings: JSON blob of syncable settings per user
+  dictionary_entries: Custom dictionary words (soft-deletable)
+  corrections: Word correction pairs from user edits
+  transcripts: Transcript history with device source
+
+api_routes:
+  public:
+    - POST /api/auth/register
+    - POST /api/auth/login
+    - POST /api/auth/refresh
+    - POST /api/auth/logout
+  authenticated:
+    - GET/PUT /api/sync/settings
+    - GET/POST/DELETE /api/sync/dictionary
+    - GET/POST /api/sync/corrections
+    - GET/POST /api/sync/transcripts

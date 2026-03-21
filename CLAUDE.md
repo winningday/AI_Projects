@@ -149,6 +149,7 @@ Hub files contain only: frontmatter + summary + links to sub-docs.
 
 | Folder | Status | Stack | CLAUDE.md | .context/ | MEMORY.md | TODO.md |
 |--------|--------|-------|-----------|-----------|-----------|---------|
+| `VoiceTranscriberAPI/` | Active | TypeScript, Hono, Cloudflare Workers, D1 | Yes | Yes | Needed | Needed |
 | `VoiceTranscriber/` | Active | Swift, SwiftUI, GRDB, OpenAI, Anthropic | Needed | Yes | Needed | Needed |
 | `instagram-assistant/` | Active | Python, Streamlit, SQLite, Claude | Needed | No | Needed | Needed |
 | `resume-maker/` | Active | Python, RenderCV, Claude API | Needed | No | Needed | Needed |

@@ -13,7 +13,7 @@ last_updated: 2026-03-18
 |---------|--------|---------------|-------------|
 | VoiceTranscriber | Active | Maintenance | Check open bug: transcription not working → see `VoiceTranscriber/TODO.md` |
 | VoiceTranscriberIOS | Active | Cloud sync planning | Build sync API backend → see `VoiceTranscriberIOS/TODO.md` |
-| VoiceTranscriberAPI | Planned | Not started | Cloudflare Workers + D1 backend for cross-device sync → see `VoiceTranscriberIOS/.context/cloud-sync-plan.yaml` |
+| VoiceTranscriberAPI | Active | Phase 1 built | Deploy + test backend → see `VoiceTranscriberAPI/README.md` |
 | instagram-assistant | Active | Phase 2 | Implement comment scraping → see `instagram-assistant/TODO.md` |
 | resume-maker | Active | Stable | No immediate tasks |
 | video_editor | Active | Development | Continue pipeline work → see `video_editor/TODO.md` |
