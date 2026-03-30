@@ -276,10 +276,12 @@ final class AppState: ObservableObject {
             let styleTone = detectStyleTone(appName: activeApp)
 
             // Step 3: Clean transcript
+            // Force AI cleanup when translation is enabled (programmatic cleaner can't translate)
+            let needsAICleanup = config.useAICleanup || config.translationEnabled
             let cleanedText: String
-            if config.useAICleanup {
-                // AI cleanup via Claude (opt-in — can hallucinate on short/question-like input)
-                statusMessage = "Cleaning up..."
+            if needsAICleanup {
+                // AI cleanup via Claude (handles translation, advanced formatting, context awareness)
+                statusMessage = config.translationEnabled ? "Translating..." : "Cleaning up..."
                 cleanedText = try await claudeClient.cleanTranscription(
                     rawText,
                     dictionaryWords: config.dictionaryWords,

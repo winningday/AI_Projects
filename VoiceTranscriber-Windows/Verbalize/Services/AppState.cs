@@ -236,10 +236,12 @@ public class AppState : INotifyPropertyChanged, IDisposable
         }
 
         // Step 3: Clean transcript
+        // Force AI cleanup when translation is enabled (programmatic cleaner can't translate)
+        var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
         string cleanedText;
-        if (Config.UseAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
+        if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
         {
-            // AI cleanup via Claude (opt-in — can hallucinate on short/question-like input)
+            // AI cleanup via Claude (handles translation, advanced formatting, context awareness)
             cleanedText = await ClaudeClient.CleanTranscriptionAsync(
                 rawText,
                 Config.AnthropicApiKey,
