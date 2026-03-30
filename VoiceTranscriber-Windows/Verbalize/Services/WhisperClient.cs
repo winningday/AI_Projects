@@ -18,13 +18,15 @@ public class WhisperClient
         string apiKey,
         IReadOnlyList<string>? dictionaryWords = null,
         string? languageHint = null,
-        string? contextHint = null)
+        string? contextHint = null,
+        string? model = null)
     {
-        // Try primary model first, fall back to whisper-1
+        var selectedModel = model ?? PrimaryModel;
+        // Try selected model first, fall back to whisper-1
         try
         {
             return await TranscribeWithModelAsync(
-                audioFilePath, apiKey, PrimaryModel, dictionaryWords, languageHint, contextHint);
+                audioFilePath, apiKey, selectedModel, dictionaryWords, languageHint, contextHint);
         }
         catch
         {

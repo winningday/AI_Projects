@@ -48,6 +48,8 @@ final class AppState: ObservableObject {
 
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
+    private let claudeAudioClient = ClaudeAudioClient()
+    private let deepgramClient = DeepgramClient()
     private let appleSpeechClient = AppleSpeechClient()
     private let recordingWindow = RecordingWindowController()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
@@ -250,40 +252,15 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // Step 1: Transcribe audio
-            statusMessage = "Transcribing..."
-            let rawText: String
-            switch config.transcriptionEngine {
-            case .whisper:
-                rawText = try await whisperClient.transcribe(
-                    fileURL: url,
-                    language: config.translationEnabled ? nil : "en",
-                    dictionaryWords: config.dictionaryWords,
-                    contextHint: contextText
-                )
-            case .appleSpeech:
-                rawText = try await appleSpeechClient.transcribe(fileURL: url)
-            }
-
-            guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                isProcessing = false
-                statusMessage = "Ready"
-                lastError = "No speech detected."
-                return
-            }
-
-            // Step 2: Determine style based on active app
             let styleTone = detectStyleTone(appName: activeApp)
-
-            // Step 3: Clean transcript
-            // Force AI cleanup when translation is enabled (programmatic cleaner can't translate)
-            let needsAICleanup = config.useAICleanup || config.translationEnabled
+            let rawText: String
             let cleanedText: String
-            if needsAICleanup {
-                // AI cleanup via Claude (handles translation, advanced formatting, context awareness)
-                statusMessage = config.translationEnabled ? "Translating..." : "Cleaning up..."
-                cleanedText = try await claudeClient.cleanTranscription(
-                    rawText,
+
+            // Claude Direct Audio handles transcription + cleanup in one call
+            if config.transcriptionEngine == .claudeAudio {
+                statusMessage = "Transcribing & cleaning..."
+                let result = try await claudeAudioClient.transcribeAndClean(
+                    fileURL: url,
                     dictionaryWords: config.dictionaryWords,
                     styleTone: styleTone,
                     activeApp: activeApp,
@@ -293,12 +270,76 @@ final class AppState: ObservableObject {
                     targetLanguage: config.targetLanguage,
                     recentCorrections: config.recentCorrections
                 )
+                rawText = result.rawText
+                cleanedText = result.cleanedText
             } else {
-                // Programmatic cleanup (default — fast, deterministic, no hallucination)
-                cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: styleTone)
+                // Step 1: Transcribe audio with selected engine
+                statusMessage = "Transcribing..."
+                switch config.transcriptionEngine {
+                case .whisperMini:
+                    rawText = try await whisperClient.transcribe(
+                        fileURL: url,
+                        model: "gpt-4o-mini-transcribe",
+                        language: config.translationEnabled ? nil : "en",
+                        dictionaryWords: config.dictionaryWords,
+                        contextHint: contextText
+                    )
+                case .whisperFull:
+                    rawText = try await whisperClient.transcribe(
+                        fileURL: url,
+                        model: "gpt-4o-transcribe",
+                        language: config.translationEnabled ? nil : "en",
+                        dictionaryWords: config.dictionaryWords,
+                        contextHint: contextText
+                    )
+                case .deepgram:
+                    rawText = try await deepgramClient.transcribe(
+                        fileURL: url,
+                        language: config.translationEnabled ? nil : "en",
+                        dictionaryWords: config.dictionaryWords
+                    )
+                case .appleSpeech:
+                    rawText = try await appleSpeechClient.transcribe(fileURL: url)
+                case .claudeAudio:
+                    fatalError("Handled above")
+                }
+
+                guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    isProcessing = false
+                    statusMessage = "Ready"
+                    lastError = "No speech detected."
+                    return
+                }
+
+                // Step 2: Clean transcript
+                // Force AI cleanup when translation is enabled (programmatic cleaner can't translate)
+                let needsAICleanup = config.useAICleanup || config.translationEnabled
+                if needsAICleanup {
+                    statusMessage = config.translationEnabled ? "Translating..." : "Cleaning up..."
+                    cleanedText = try await claudeClient.cleanTranscription(
+                        rawText,
+                        dictionaryWords: config.dictionaryWords,
+                        styleTone: styleTone,
+                        activeApp: activeApp,
+                        contextText: config.contextAwareness ? contextText : nil,
+                        smartFormatting: config.smartFormatting,
+                        translationEnabled: config.translationEnabled,
+                        targetLanguage: config.targetLanguage,
+                        recentCorrections: config.recentCorrections
+                    )
+                } else {
+                    cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: styleTone)
+                }
             }
 
-            // Step 4: Save
+            guard !cleanedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                isProcessing = false
+                statusMessage = "Ready"
+                lastError = "No speech detected."
+                return
+            }
+
+            // Step 3: Save
             let transcript = Transcript(
                 originalText: rawText,
                 cleanedText: cleanedText,

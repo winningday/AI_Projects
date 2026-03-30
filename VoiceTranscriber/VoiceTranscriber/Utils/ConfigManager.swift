@@ -4,24 +4,55 @@ import ServiceManagement
 
 /// Transcription engine choice.
 enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
-    case whisper = "whisper"
+    case whisperMini = "whisper_mini"
+    case whisperFull = "whisper_full"
+    case claudeAudio = "claude_audio"
+    case deepgram = "deepgram"
     case appleSpeech = "apple_speech"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .whisper: return "OpenAI Whisper"
+        case .whisperMini: return "OpenAI Whisper (Fast)"
+        case .whisperFull: return "OpenAI Whisper (Accurate)"
+        case .claudeAudio: return "Claude Direct Audio"
+        case .deepgram: return "Deepgram Nova-2"
         case .appleSpeech: return "Apple Speech (On-Device)"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .whisper: return "Cloud-based, requires API key"
-        case .appleSpeech: return "Free, fast, no API key needed"
+        case .whisperMini: return "gpt-4o-mini-transcribe — fast, good accuracy. Requires OpenAI key."
+        case .whisperFull: return "gpt-4o-transcribe — best accuracy, slightly slower. Requires OpenAI key."
+        case .claudeAudio: return "Transcribe + clean in one call. Uses your Claude key — no OpenAI key needed."
+        case .deepgram: return "Nova-2 — very fast, great accuracy. Requires Deepgram key."
+        case .appleSpeech: return "Free, on-device, no API key. Lower accuracy."
         }
     }
+
+    /// Which API key this engine requires
+    var requiredKeyType: RequiredKeyType {
+        switch self {
+        case .whisperMini, .whisperFull: return .openAI
+        case .claudeAudio: return .claude
+        case .deepgram: return .deepgram
+        case .appleSpeech: return .none
+        }
+    }
+
+    /// Whether this engine handles cleanup internally (no separate Claude call needed)
+    var includesCleanup: Bool {
+        switch self {
+        case .claudeAudio: return true
+        default: return false
+        }
+    }
+}
+
+enum RequiredKeyType {
+    case openAI, claude, deepgram, none
 }
 
 /// Style profile for different message contexts.
@@ -153,6 +184,7 @@ final class ConfigManager: ObservableObject {
     private enum APIKeys {
         static let openAI = "stored_openai_api_key"
         static let claude = "stored_claude_api_key"
+        static let deepgram = "stored_deepgram_api_key"
     }
 
     // MARK: - Published Properties
@@ -315,12 +347,13 @@ final class ConfigManager: ObservableObject {
         self.targetLanguage = defaults.string(forKey: Keys.targetLanguage) ?? "en"
         let savedTypingSpeed = defaults.integer(forKey: Keys.typingSpeed)
         self.typingSpeed = savedTypingSpeed > 0 ? savedTypingSpeed : 40
-        self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? false
+        self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
         if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
            let engine = TranscriptionEngine(rawValue: engineRaw) {
             self.transcriptionEngine = engine
         } else {
-            self.transcriptionEngine = .whisper
+            // Default or migrate old "whisper" value
+            self.transcriptionEngine = .whisperMini
         }
 
         // Load dictionary
@@ -507,16 +540,40 @@ final class ConfigManager: ObservableObject {
         }
     }
 
+    var deepgramAPIKey: String? {
+        get {
+            let stored = defaults.string(forKey: APIKeys.deepgram)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["DEEPGRAM_API_KEY"]
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.deepgram)
+            } else {
+                defaults.removeObject(forKey: APIKeys.deepgram)
+            }
+            objectWillChange.send()
+        }
+    }
+
     /// Whether required API keys are configured for the current engine/cleanup settings.
     var hasAPIKeys: Bool {
-        let needsOpenAI = transcriptionEngine == .whisper
-        let needsClaude = useAICleanup || translationEnabled
-
         let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
         let hasClaude = !(claudeAPIKey ?? "").isEmpty
+        let hasDeepgram = !(deepgramAPIKey ?? "").isEmpty
 
-        if needsOpenAI && !hasOpenAI { return false }
+        // Check transcription engine key requirement
+        switch transcriptionEngine.requiredKeyType {
+        case .openAI: if !hasOpenAI { return false }
+        case .claude: if !hasClaude { return false }
+        case .deepgram: if !hasDeepgram { return false }
+        case .none: break
+        }
+
+        // Claude key needed for AI cleanup (unless engine does cleanup itself) or translation
+        let needsClaude = (useAICleanup && !transcriptionEngine.includesCleanup) || translationEnabled
         if needsClaude && !hasClaude { return false }
+
         return true
     }
 

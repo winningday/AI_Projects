@@ -18,6 +18,8 @@ public class AppState : INotifyPropertyChanged, IDisposable
     public HotKeyManager HotKeyManager { get; } = new();
     public WhisperClient WhisperClient { get; } = new();
     public ClaudeClient ClaudeClient { get; } = new();
+    public ClaudeAudioClient ClaudeAudioClient { get; } = new();
+    public DeepgramClient DeepgramClient { get; } = new();
     public ConfigManager Config { get; } = new();
     public TranscriptDatabase Database { get; } = new();
     public CorrectionTracker CorrectionTracker { get; private set; }
@@ -134,17 +136,25 @@ public class AppState : INotifyPropertyChanged, IDisposable
     {
         ErrorMessage = null;
 
-        // Validate API keys (only require what's needed for current settings)
-        if (string.IsNullOrEmpty(Config.OpenAIApiKey))
+        // Validate API keys based on selected engine
+        var engine = Config.TranscriptionEngine;
+        if ((engine == TranscriptionEngine.WhisperMini || engine == TranscriptionEngine.WhisperFull)
+            && string.IsNullOrEmpty(Config.OpenAIApiKey))
         {
             ErrorMessage = "OpenAI API key not set. Go to Settings to configure.";
             Status = AppStatus.Error;
             return;
         }
-
-        if (Config.UseAICleanup && string.IsNullOrEmpty(Config.AnthropicApiKey))
+        if ((engine == TranscriptionEngine.ClaudeAudio || Config.UseAICleanup || Config.TranslationEnabled)
+            && string.IsNullOrEmpty(Config.AnthropicApiKey))
         {
-            ErrorMessage = "Claude API key not set but AI cleanup is enabled. Go to Settings to configure, or disable AI cleanup.";
+            ErrorMessage = "Claude API key not set. Go to Settings to configure.";
+            Status = AppStatus.Error;
+            return;
+        }
+        if (engine == TranscriptionEngine.Deepgram && string.IsNullOrEmpty(Config.DeepgramApiKey))
+        {
+            ErrorMessage = "Deepgram API key not set. Go to Settings to configure.";
             Status = AppStatus.Error;
             return;
         }
@@ -211,23 +221,10 @@ public class AppState : INotifyPropertyChanged, IDisposable
 
     private async Task ProcessRecordingAsync(string filePath, double duration)
     {
-        // Step 1: Transcribe with Whisper
         var dictionaryWords = Config.DictionaryEntries.Select(e => e.Word).ToList();
         var languageHint = Config.TranslationEnabled ? null : "en";
 
-        var rawText = await WhisperClient.TranscribeAsync(
-            filePath,
-            Config.OpenAIApiKey,
-            dictionaryWords,
-            languageHint);
-
-        if (string.IsNullOrWhiteSpace(rawText))
-        {
-            Status = AppStatus.Idle;
-            return;
-        }
-
-        // Step 2: Determine style tone from context
+        // Determine style tone from context
         var tone = StyleTone.Casual;
         if (Config.ContextAwareness && !string.IsNullOrEmpty(_capturedAppName))
         {
@@ -235,28 +232,67 @@ public class AppState : INotifyPropertyChanged, IDisposable
             tone = Config.GetStyleForContext(context);
         }
 
-        // Step 3: Clean transcript
-        // Force AI cleanup when translation is enabled (programmatic cleaner can't translate)
-        var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
+        string rawText;
         string cleanedText;
-        if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
+
+        // Claude Direct Audio handles transcription + cleanup in one call
+        if (Config.TranscriptionEngine == TranscriptionEngine.ClaudeAudio)
         {
-            // AI cleanup via Claude (handles translation, advanced formatting, context awareness)
-            cleanedText = await ClaudeClient.CleanTranscriptionAsync(
-                rawText,
-                Config.AnthropicApiKey,
-                tone,
-                dictionaryWords,
-                Config.Corrections,
-                null, // Surrounding context — complex on Windows, skip for now
-                _capturedAppName,
-                Config.TranslationEnabled,
-                Config.TargetLanguage);
+            var result = await ClaudeAudioClient.TranscribeAndCleanAsync(
+                filePath, Config.AnthropicApiKey, tone, dictionaryWords,
+                Config.Corrections, _capturedAppName,
+                Config.TranslationEnabled, Config.TargetLanguage, Config.SmartFormatting);
+            rawText = result.RawText;
+            cleanedText = result.CleanedText;
         }
         else
         {
-            // Programmatic cleanup (default — fast, deterministic, no hallucination)
-            cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
+            // Step 1: Transcribe with selected engine
+            switch (Config.TranscriptionEngine)
+            {
+                case TranscriptionEngine.WhisperMini:
+                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                        dictionaryWords, languageHint, model: "gpt-4o-mini-transcribe");
+                    break;
+                case TranscriptionEngine.WhisperFull:
+                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                        dictionaryWords, languageHint, model: "gpt-4o-transcribe");
+                    break;
+                case TranscriptionEngine.Deepgram:
+                    rawText = await DeepgramClient.TranscribeAsync(filePath, Config.DeepgramApiKey,
+                        dictionaryWords, languageHint);
+                    break;
+                default:
+                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                        dictionaryWords, languageHint);
+                    break;
+            }
+
+            if (string.IsNullOrWhiteSpace(rawText))
+            {
+                Status = AppStatus.Idle;
+                return;
+            }
+
+            // Step 2: Clean transcript
+            var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
+            if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
+            {
+                cleanedText = await ClaudeClient.CleanTranscriptionAsync(
+                    rawText, Config.AnthropicApiKey, tone, dictionaryWords,
+                    Config.Corrections, null, _capturedAppName,
+                    Config.TranslationEnabled, Config.TargetLanguage);
+            }
+            else
+            {
+                cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(cleanedText))
+        {
+            Status = AppStatus.Idle;
+            return;
         }
 
         // Step 4: Save transcript

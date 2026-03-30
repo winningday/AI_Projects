@@ -10,8 +10,10 @@ struct AppSettingsView: View {
 
     @State private var openAIKey = ""
     @State private var claudeKey = ""
+    @State private var deepgramKey = ""
     @State private var showOpenAIKey = false
     @State private var showClaudeKey = false
+    @State private var showDeepgramKey = false
     @State private var isCapturingHotkey = false
     @State private var showSavedAlert = false
     @State private var showDeleteConfirm = false
@@ -143,14 +145,15 @@ struct AppSettingsView: View {
                     }
                     .pickerStyle(.radioGroup)
 
-                    if config.transcriptionEngine == .appleSpeech {
-                        Text("Uses Apple's on-device speech recognition. Free, fast, no API key needed. Works offline.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Uses OpenAI's cloud transcription. Requires an OpenAI API key. Supports dictionary hints for better accuracy with names and technical terms.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                    if config.transcriptionEngine.includesCleanup {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.purple)
+                                .font(.system(size: 11))
+                            Text("This engine transcribes and cleans in a single step — all your settings (dictionary, style, corrections) are applied automatically.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.purple)
+                        }
                     }
                 }
 
@@ -263,11 +266,20 @@ struct AppSettingsView: View {
                         isSaved: !(config.claudeAPIKey ?? "").isEmpty,
                         link: ("console.anthropic.com", "https://console.anthropic.com/settings/keys")
                     )
+                    APIKeyField(
+                        label: "Deepgram",
+                        placeholder: "dg-...",
+                        key: $deepgramKey,
+                        showKey: $showDeepgramKey,
+                        isSaved: !(config.deepgramAPIKey ?? "").isEmpty,
+                        link: ("console.deepgram.com", "https://console.deepgram.com")
+                    )
 
                     HStack {
                         Button("Save API Keys") {
                             config.openAIAPIKey = openAIKey.isEmpty ? nil : openAIKey
                             config.claudeAPIKey = claudeKey.isEmpty ? nil : claudeKey
+                            config.deepgramAPIKey = deepgramKey.isEmpty ? nil : deepgramKey
                             showSavedAlert = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -361,6 +373,7 @@ struct AppSettingsView: View {
         .onAppear {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
+            deepgramKey = config.deepgramAPIKey ?? ""
             refreshPermissions()
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {
