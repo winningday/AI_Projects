@@ -13,6 +13,7 @@ final class WhisperClient {
     /// Transcribes an audio file using OpenAI's transcription API.
     func transcribe(
         fileURL: URL,
+        model: String = "gpt-4o-mini-transcribe",
         language: String? = "en",
         dictionaryWords: [String] = [],
         contextHint: String? = nil
@@ -25,8 +26,6 @@ final class WhisperClient {
         guard !audioData.isEmpty else {
             throw WhisperError.emptyAudioFile
         }
-
-        let model = "gpt-4o-mini-transcribe"
 
         let boundary = UUID().uuidString
         var request = URLRequest(url: URL(string: baseURL)!)

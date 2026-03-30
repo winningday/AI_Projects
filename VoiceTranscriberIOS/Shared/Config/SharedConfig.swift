@@ -27,6 +27,8 @@ final class SharedConfig: ObservableObject {
         static let typingSpeed = "typingSpeed"
         static let corrections = "corrections"
         static let defaultStyleTone = "defaultStyleTone"
+        static let useAICleanup = "useAICleanup"
+        static let transcriptionEngine = "transcriptionEngine"
     }
 
     // MARK: - API Key Storage Keys
@@ -34,6 +36,7 @@ final class SharedConfig: ObservableObject {
     private enum APIKeys {
         static let openAI = "stored_openai_api_key"
         static let claude = "stored_claude_api_key"
+        static let deepgram = "stored_deepgram_api_key"
     }
 
     // MARK: - Published Properties
@@ -72,6 +75,14 @@ final class SharedConfig: ObservableObject {
 
     @Published var defaultStyleTone: StyleTone {
         didSet { defaults.set(defaultStyleTone.rawValue, forKey: Keys.defaultStyleTone) }
+    }
+
+    @Published var useAICleanup: Bool {
+        didSet { defaults.set(useAICleanup, forKey: Keys.useAICleanup) }
+    }
+
+    @Published var transcriptionEngine: TranscriptionEngine {
+        didSet { defaults.set(transcriptionEngine.rawValue, forKey: Keys.transcriptionEngine) }
     }
 
     static let supportedLanguages: [(code: String, name: String)] = [
@@ -162,6 +173,13 @@ final class SharedConfig: ObservableObject {
             self.defaultStyleTone = tone
         } else {
             self.defaultStyleTone = .casual
+        }
+        self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
+        if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
+           let engine = TranscriptionEngine(rawValue: engineRaw) {
+            self.transcriptionEngine = engine
+        } else {
+            self.transcriptionEngine = .whisperMini
         }
 
         // Load dictionary
@@ -275,9 +293,40 @@ final class SharedConfig: ObservableObject {
         }
     }
 
+    var deepgramAPIKey: String? {
+        get {
+            let stored = defaults.string(forKey: APIKeys.deepgram)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["DEEPGRAM_API_KEY"]
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.deepgram)
+            } else {
+                defaults.removeObject(forKey: APIKeys.deepgram)
+            }
+            objectWillChange.send()
+        }
+    }
+
     var hasAPIKeys: Bool {
-        openAIAPIKey != nil && claudeAPIKey != nil &&
-        !(openAIAPIKey?.isEmpty ?? true) && !(claudeAPIKey?.isEmpty ?? true)
+        let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
+        let hasClaude = !(claudeAPIKey ?? "").isEmpty
+        let hasDeepgram = !(deepgramAPIKey ?? "").isEmpty
+
+        // Check transcription engine key requirement
+        switch transcriptionEngine.requiredKeyType {
+        case .openAI: if !hasOpenAI { return false }
+        case .deepgram: if !hasDeepgram { return false }
+        case .claude: if !hasClaude { return false }
+        case .none: break
+        }
+
+        // Claude key needed for AI cleanup or translation
+        let needsClaude = useAICleanup || translationEnabled
+        if needsClaude && !hasClaude { return false }
+
+        return true
     }
 
     // MARK: - Simple Obfuscation (base64 encoding to avoid plain-text in plist)
@@ -313,6 +362,11 @@ final class SharedConfig: ObservableObject {
         if let raw = defaults.string(forKey: Keys.defaultStyleTone),
            let tone = StyleTone(rawValue: raw) {
             self.defaultStyleTone = tone
+        }
+        self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
+        if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
+           let engine = TranscriptionEngine(rawValue: engineRaw) {
+            self.transcriptionEngine = engine
         }
 
         if let data = defaults.data(forKey: Keys.styleProfiles),

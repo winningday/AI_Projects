@@ -12,6 +12,7 @@ class KeyboardViewController: UIInputViewController {
     private let config = SharedConfig.shared
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
+    private let deepgramClient = DeepgramClient()
     private let audioRecorder = AudioRecorderIOS()
     private lazy var correctionTracker = CorrectionTracker()
 
@@ -205,14 +206,33 @@ class KeyboardViewController: UIInputViewController {
         }
 
         do {
-            // Step 1: Transcribe with Whisper
+            // Step 1: Transcribe with selected engine
             keyboardState.statusMessage = "Transcribing..."
-            let rawText = try await whisperClient.transcribe(
-                fileURL: url,
-                language: config.translationEnabled ? nil : "en",
-                dictionaryWords: config.dictionaryWords,
-                contextHint: contextText
-            )
+            let rawText: String
+            switch config.transcriptionEngine {
+            case .whisperMini:
+                rawText = try await whisperClient.transcribe(
+                    fileURL: url,
+                    model: "gpt-4o-mini-transcribe",
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords,
+                    contextHint: contextText
+                )
+            case .whisperFull:
+                rawText = try await whisperClient.transcribe(
+                    fileURL: url,
+                    model: "gpt-4o-transcribe",
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords,
+                    contextHint: contextText
+                )
+            case .deepgram:
+                rawText = try await deepgramClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            }
 
             guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 keyboardState.isProcessing = false
@@ -221,22 +241,33 @@ class KeyboardViewController: UIInputViewController {
                 return
             }
 
-            // Step 2: Clean with Claude
-            keyboardState.statusMessage = "Cleaning..."
-            let cleanedText = try await claudeClient.cleanTranscription(
-                rawText,
-                dictionaryWords: config.dictionaryWords,
-                styleTone: config.defaultStyleTone,
-                contextText: contextText,
-                smartFormatting: config.smartFormatting,
-                translationEnabled: config.translationEnabled,
-                targetLanguage: config.targetLanguage,
-                recentCorrections: config.recentCorrections,
-                inputContextHint: inputContext
-            )
+            // Step 2: Clean transcript
+            let cleanedText: String
+            let needsAICleanup = config.useAICleanup || config.translationEnabled
+            if needsAICleanup {
+                keyboardState.statusMessage = config.translationEnabled ? "Translating..." : "Cleaning..."
+                cleanedText = try await claudeClient.cleanTranscription(
+                    rawText,
+                    dictionaryWords: config.dictionaryWords,
+                    styleTone: config.defaultStyleTone,
+                    contextText: contextText,
+                    smartFormatting: config.smartFormatting,
+                    translationEnabled: config.translationEnabled,
+                    targetLanguage: config.targetLanguage,
+                    recentCorrections: config.recentCorrections,
+                    inputContextHint: inputContext
+                )
+            } else {
+                cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: config.defaultStyleTone)
+            }
 
-            // Step 3: Insert text into the active field
-            textDocumentProxy.insertText(cleanedText)
+            // Step 3: Insert text into the active field (with space prepend)
+            let beforeContext = textDocumentProxy.documentContextBeforeInput ?? ""
+            if let lastChar = beforeContext.last, !lastChar.isWhitespace && !lastChar.isNewline {
+                textDocumentProxy.insertText(" " + cleanedText)
+            } else {
+                textDocumentProxy.insertText(cleanedText)
+            }
 
             // Step 4: Save transcript
             let transcript = Transcript(

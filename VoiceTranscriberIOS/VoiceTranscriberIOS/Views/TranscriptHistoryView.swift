@@ -9,6 +9,31 @@ struct TranscriptHistoryView: View {
         searchResults ?? appState.database.transcripts
     }
 
+    private var groupedTranscripts: [(key: String, transcripts: [Transcript])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+
+        let grouped = Dictionary(grouping: displayedTranscripts) { (transcript: Transcript) -> String in
+            let date = calendar.startOfDay(for: transcript.timestamp)
+            if date == today { return "Today" }
+            if date == yesterday { return "Yesterday" }
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return formatter.string(from: transcript.timestamp)
+        }
+
+        // Sort: Today first, Yesterday second, then by date descending
+        return grouped.sorted { a, b in
+            if a.key == "Today" { return true }
+            if b.key == "Today" { return false }
+            if a.key == "Yesterday" { return true }
+            if b.key == "Yesterday" { return false }
+            guard let aDate = a.value.first?.timestamp, let bDate = b.value.first?.timestamp else { return false }
+            return aDate > bDate
+        }.map { (key: $0.key, transcripts: $0.value) }
+    }
+
     var body: some View {
         NavigationView {
             Group {
@@ -30,17 +55,21 @@ struct TranscriptHistoryView: View {
                     .padding()
                 } else {
                     List {
-                        ForEach(displayedTranscripts) { transcript in
-                            TranscriptRow(transcript: transcript) {
-                                UIPasteboard.general.string = transcript.cleanedText
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                            }
-                        }
-                        .onDelete { indexSet in
-                            for index in indexSet {
-                                let transcript = displayedTranscripts[index]
-                                try? appState.database.delete(transcript)
+                        ForEach(groupedTranscripts, id: \.key) { group in
+                            Section(header: Text(group.key)) {
+                                ForEach(group.transcripts) { transcript in
+                                    TranscriptRow(transcript: transcript) {
+                                        UIPasteboard.general.string = transcript.cleanedText
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                    }
+                                }
+                                .onDelete { indexSet in
+                                    for index in indexSet {
+                                        let transcript = group.transcripts[index]
+                                        try? appState.database.delete(transcript)
+                                    }
+                                }
                             }
                         }
                     }
