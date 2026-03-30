@@ -5,7 +5,6 @@ public enum TranscriptionEngine
 {
     WhisperMini,
     WhisperFull,
-    ClaudeAudio,
     Deepgram
 }
 
@@ -15,7 +14,6 @@ public static class TranscriptionEngineExtensions
     {
         TranscriptionEngine.WhisperMini => "OpenAI Whisper (Fast)",
         TranscriptionEngine.WhisperFull => "OpenAI Whisper (Accurate)",
-        TranscriptionEngine.ClaudeAudio => "Claude Direct Audio",
         TranscriptionEngine.Deepgram => "Deepgram Nova-2",
         _ => "OpenAI Whisper (Fast)"
     };
@@ -24,14 +22,9 @@ public static class TranscriptionEngineExtensions
     {
         TranscriptionEngine.WhisperMini => "gpt-4o-mini-transcribe — fast, good accuracy",
         TranscriptionEngine.WhisperFull => "gpt-4o-transcribe — best accuracy, slightly slower",
-        TranscriptionEngine.ClaudeAudio => "Transcribe + clean in one call, uses Claude key",
         TranscriptionEngine.Deepgram => "Nova-2 — very fast, great accuracy",
         _ => ""
     };
-
-    /// <summary>Whether this engine handles cleanup internally.</summary>
-    public static bool IncludesCleanup(this TranscriptionEngine engine) =>
-        engine == TranscriptionEngine.ClaudeAudio;
 }
 
 public enum StyleTone

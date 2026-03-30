@@ -85,16 +85,6 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <RadioButton x:Name="EngineClaudeAudio" GroupName="Engine"
-                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
-                                 Margin="0,6,0,2" Checked="Engine_Changed">
-                        <StackPanel>
-                            <TextBlock Text="Claude Direct Audio" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                            <TextBlock Text="Transcribe + clean in one call, uses Claude key" FontSize="11"
-                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </RadioButton>
-
                     <RadioButton x:Name="EngineDeepgram" GroupName="Engine"
                                  Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
                                  Margin="0,6,0,0" Checked="Engine_Changed">

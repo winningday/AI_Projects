@@ -6,7 +6,6 @@ import ServiceManagement
 enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case whisperMini = "whisper_mini"
     case whisperFull = "whisper_full"
-    case claudeAudio = "claude_audio"
     case deepgram = "deepgram"
     case appleSpeech = "apple_speech"
 
@@ -16,7 +15,6 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .whisperMini: return "OpenAI Whisper (Fast)"
         case .whisperFull: return "OpenAI Whisper (Accurate)"
-        case .claudeAudio: return "Claude Direct Audio"
         case .deepgram: return "Deepgram Nova-2"
         case .appleSpeech: return "Apple Speech (On-Device)"
         }
@@ -26,7 +24,6 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .whisperMini: return "gpt-4o-mini-transcribe — fast, good accuracy. Requires OpenAI key."
         case .whisperFull: return "gpt-4o-transcribe — best accuracy, slightly slower. Requires OpenAI key."
-        case .claudeAudio: return "Transcribe + clean in one call. Uses your Claude key — no OpenAI key needed."
         case .deepgram: return "Nova-2 — very fast, great accuracy. Requires Deepgram key."
         case .appleSpeech: return "Free, on-device, no API key. Lower accuracy."
         }
@@ -36,17 +33,8 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     var requiredKeyType: RequiredKeyType {
         switch self {
         case .whisperMini, .whisperFull: return .openAI
-        case .claudeAudio: return .claude
         case .deepgram: return .deepgram
         case .appleSpeech: return .none
-        }
-    }
-
-    /// Whether this engine handles cleanup internally (no separate Claude call needed)
-    var includesCleanup: Bool {
-        switch self {
-        case .claudeAudio: return true
-        default: return false
         }
     }
 }
@@ -570,8 +558,8 @@ final class ConfigManager: ObservableObject {
         case .none: break
         }
 
-        // Claude key needed for AI cleanup (unless engine does cleanup itself) or translation
-        let needsClaude = (useAICleanup && !transcriptionEngine.includesCleanup) || translationEnabled
+        // Claude key needed for AI cleanup or translation
+        let needsClaude = useAICleanup || translationEnabled
         if needsClaude && !hasClaude { return false }
 
         return true

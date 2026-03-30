@@ -48,7 +48,6 @@ final class AppState: ObservableObject {
 
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
-    private let claudeAudioClient = ClaudeAudioClient()
     private let deepgramClient = DeepgramClient()
     private let appleSpeechClient = AppleSpeechClient()
     private let recordingWindow = RecordingWindowController()
@@ -256,53 +255,34 @@ final class AppState: ObservableObject {
             let rawText: String
             let cleanedText: String
 
-            // Claude Direct Audio handles transcription + cleanup in one call
-            if config.transcriptionEngine == .claudeAudio {
-                statusMessage = "Transcribing & cleaning..."
-                let result = try await claudeAudioClient.transcribeAndClean(
+            // Step 1: Transcribe audio with selected engine
+            statusMessage = "Transcribing..."
+            switch config.transcriptionEngine {
+            case .whisperMini:
+                rawText = try await whisperClient.transcribe(
                     fileURL: url,
+                    model: "gpt-4o-mini-transcribe",
+                    language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords,
-                    styleTone: styleTone,
-                    activeApp: activeApp,
-                    contextText: config.contextAwareness ? contextText : nil,
-                    smartFormatting: config.smartFormatting,
-                    translationEnabled: config.translationEnabled,
-                    targetLanguage: config.targetLanguage,
-                    recentCorrections: config.recentCorrections
+                    contextHint: contextText
                 )
-                rawText = result.rawText
-                cleanedText = result.cleanedText
-            } else {
-                // Step 1: Transcribe audio with selected engine
-                statusMessage = "Transcribing..."
-                switch config.transcriptionEngine {
-                case .whisperMini:
-                    rawText = try await whisperClient.transcribe(
-                        fileURL: url,
-                        model: "gpt-4o-mini-transcribe",
-                        language: config.translationEnabled ? nil : "en",
-                        dictionaryWords: config.dictionaryWords,
-                        contextHint: contextText
-                    )
-                case .whisperFull:
-                    rawText = try await whisperClient.transcribe(
-                        fileURL: url,
-                        model: "gpt-4o-transcribe",
-                        language: config.translationEnabled ? nil : "en",
-                        dictionaryWords: config.dictionaryWords,
-                        contextHint: contextText
-                    )
-                case .deepgram:
-                    rawText = try await deepgramClient.transcribe(
-                        fileURL: url,
-                        language: config.translationEnabled ? nil : "en",
-                        dictionaryWords: config.dictionaryWords
-                    )
-                case .appleSpeech:
-                    rawText = try await appleSpeechClient.transcribe(fileURL: url)
-                case .claudeAudio:
-                    fatalError("Handled above")
-                }
+            case .whisperFull:
+                rawText = try await whisperClient.transcribe(
+                    fileURL: url,
+                    model: "gpt-4o-transcribe",
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords,
+                    contextHint: contextText
+                )
+            case .deepgram:
+                rawText = try await deepgramClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            case .appleSpeech:
+                rawText = try await appleSpeechClient.transcribe(fileURL: url)
+            }
 
                 guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     isProcessing = false
@@ -330,7 +310,6 @@ final class AppState: ObservableObject {
                 } else {
                     cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: styleTone)
                 }
-            }
 
             guard !cleanedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 isProcessing = false

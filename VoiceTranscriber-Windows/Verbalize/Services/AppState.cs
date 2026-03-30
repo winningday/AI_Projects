@@ -18,7 +18,6 @@ public class AppState : INotifyPropertyChanged, IDisposable
     public HotKeyManager HotKeyManager { get; } = new();
     public WhisperClient WhisperClient { get; } = new();
     public ClaudeClient ClaudeClient { get; } = new();
-    public ClaudeAudioClient ClaudeAudioClient { get; } = new();
     public DeepgramClient DeepgramClient { get; } = new();
     public ConfigManager Config { get; } = new();
     public TranscriptDatabase Database { get; } = new();
@@ -145,7 +144,7 @@ public class AppState : INotifyPropertyChanged, IDisposable
             Status = AppStatus.Error;
             return;
         }
-        if ((engine == TranscriptionEngine.ClaudeAudio || Config.UseAICleanup || Config.TranslationEnabled)
+        if ((Config.UseAICleanup || Config.TranslationEnabled)
             && string.IsNullOrEmpty(Config.AnthropicApiKey))
         {
             ErrorMessage = "Claude API key not set. Go to Settings to configure.";
@@ -235,58 +234,45 @@ public class AppState : INotifyPropertyChanged, IDisposable
         string rawText;
         string cleanedText;
 
-        // Claude Direct Audio handles transcription + cleanup in one call
-        if (Config.TranscriptionEngine == TranscriptionEngine.ClaudeAudio)
+        // Step 1: Transcribe with selected engine
+        switch (Config.TranscriptionEngine)
         {
-            var result = await ClaudeAudioClient.TranscribeAndCleanAsync(
-                filePath, Config.AnthropicApiKey, tone, dictionaryWords,
-                Config.Corrections, _capturedAppName,
-                Config.TranslationEnabled, Config.TargetLanguage, Config.SmartFormatting);
-            rawText = result.RawText;
-            cleanedText = result.CleanedText;
+            case TranscriptionEngine.WhisperMini:
+                rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                    dictionaryWords, languageHint, model: "gpt-4o-mini-transcribe");
+                break;
+            case TranscriptionEngine.WhisperFull:
+                rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                    dictionaryWords, languageHint, model: "gpt-4o-transcribe");
+                break;
+            case TranscriptionEngine.Deepgram:
+                rawText = await DeepgramClient.TranscribeAsync(filePath, Config.DeepgramApiKey,
+                    dictionaryWords, languageHint);
+                break;
+            default:
+                rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
+                    dictionaryWords, languageHint);
+                break;
+        }
+
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            Status = AppStatus.Idle;
+            return;
+        }
+
+        // Step 2: Clean transcript
+        var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
+        if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
+        {
+            cleanedText = await ClaudeClient.CleanTranscriptionAsync(
+                rawText, Config.AnthropicApiKey, tone, dictionaryWords,
+                Config.Corrections, null, _capturedAppName,
+                Config.TranslationEnabled, Config.TargetLanguage);
         }
         else
         {
-            // Step 1: Transcribe with selected engine
-            switch (Config.TranscriptionEngine)
-            {
-                case TranscriptionEngine.WhisperMini:
-                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
-                        dictionaryWords, languageHint, model: "gpt-4o-mini-transcribe");
-                    break;
-                case TranscriptionEngine.WhisperFull:
-                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
-                        dictionaryWords, languageHint, model: "gpt-4o-transcribe");
-                    break;
-                case TranscriptionEngine.Deepgram:
-                    rawText = await DeepgramClient.TranscribeAsync(filePath, Config.DeepgramApiKey,
-                        dictionaryWords, languageHint);
-                    break;
-                default:
-                    rawText = await WhisperClient.TranscribeAsync(filePath, Config.OpenAIApiKey,
-                        dictionaryWords, languageHint);
-                    break;
-            }
-
-            if (string.IsNullOrWhiteSpace(rawText))
-            {
-                Status = AppStatus.Idle;
-                return;
-            }
-
-            // Step 2: Clean transcript
-            var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
-            if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
-            {
-                cleanedText = await ClaudeClient.CleanTranscriptionAsync(
-                    rawText, Config.AnthropicApiKey, tone, dictionaryWords,
-                    Config.Corrections, null, _capturedAppName,
-                    Config.TranslationEnabled, Config.TargetLanguage);
-            }
-            else
-            {
-                cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
-            }
+            cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
         }
 
         if (string.IsNullOrWhiteSpace(cleanedText))

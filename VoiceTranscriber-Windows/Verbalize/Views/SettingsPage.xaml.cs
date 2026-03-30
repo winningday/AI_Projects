@@ -34,7 +34,6 @@ public partial class SettingsPage : Page
         {
             case TranscriptionEngine.WhisperMini: EngineWhisperMini.IsChecked = true; break;
             case TranscriptionEngine.WhisperFull: EngineWhisperFull.IsChecked = true; break;
-            case TranscriptionEngine.ClaudeAudio: EngineClaudeAudio.IsChecked = true; break;
             case TranscriptionEngine.Deepgram: EngineDeepgram.IsChecked = true; break;
             default: EngineWhisperMini.IsChecked = true; break;
         }
@@ -149,8 +148,6 @@ public partial class SettingsPage : Page
             _appState.Config.TranscriptionEngine = TranscriptionEngine.WhisperMini;
         else if (EngineWhisperFull.IsChecked == true)
             _appState.Config.TranscriptionEngine = TranscriptionEngine.WhisperFull;
-        else if (EngineClaudeAudio.IsChecked == true)
-            _appState.Config.TranscriptionEngine = TranscriptionEngine.ClaudeAudio;
         else if (EngineDeepgram.IsChecked == true)
             _appState.Config.TranscriptionEngine = TranscriptionEngine.Deepgram;
     }

@@ -144,17 +144,6 @@ struct AppSettingsView: View {
                         }
                     }
                     .pickerStyle(.radioGroup)
-
-                    if config.transcriptionEngine.includesCleanup {
-                        HStack(spacing: 6) {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.purple)
-                                .font(.system(size: 11))
-                            Text("This engine transcribes and cleans in a single step — all your settings (dictionary, style, corrections) are applied automatically.")
-                                .font(.system(size: 11))
-                                .foregroundColor(.purple)
-                        }
-                    }
                 }
 
                 // Text Cleanup section
