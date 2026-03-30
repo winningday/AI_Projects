@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Verbalize.Models;
 using Verbalize.Services;
 
 namespace Verbalize.Views;
@@ -28,6 +29,16 @@ public partial class SettingsPage : Page
         AutoInjectCheck.IsChecked = _appState.Config.AutoInject;
         MinimizeToTrayCheck.IsChecked = _appState.Config.MinimizeToTray;
         LaunchAtStartupCheck.IsChecked = _appState.Config.LaunchAtStartup;
+        // Transcription engine
+        switch (_appState.Config.TranscriptionEngine)
+        {
+            case TranscriptionEngine.WhisperMini: EngineWhisperMini.IsChecked = true; break;
+            case TranscriptionEngine.WhisperFull: EngineWhisperFull.IsChecked = true; break;
+            case TranscriptionEngine.ClaudeAudio: EngineClaudeAudio.IsChecked = true; break;
+            case TranscriptionEngine.Deepgram: EngineDeepgram.IsChecked = true; break;
+            default: EngineWhisperMini.IsChecked = true; break;
+        }
+
         UseAICleanupCheck.IsChecked = _appState.Config.UseAICleanup;
         UpdateCleanupDescription();
         ContextAwarenessCheck.IsChecked = _appState.Config.ContextAwareness;
@@ -48,6 +59,8 @@ public partial class SettingsPage : Page
             OpenAIKeyBox.Password = _appState.Config.OpenAIApiKey;
         if (!string.IsNullOrEmpty(_appState.Config.AnthropicApiKey))
             AnthropicKeyBox.Password = _appState.Config.AnthropicApiKey;
+        if (!string.IsNullOrEmpty(_appState.Config.DeepgramApiKey))
+            DeepgramKeyBox.Password = _appState.Config.DeepgramApiKey;
 
         _loading = false;
     }
@@ -126,6 +139,26 @@ public partial class SettingsPage : Page
     {
         if (_loading) return;
         _appState.Config.AnthropicApiKey = AnthropicKeyBox.Password;
+    }
+
+    private void Engine_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+
+        if (EngineWhisperMini.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.WhisperMini;
+        else if (EngineWhisperFull.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.WhisperFull;
+        else if (EngineClaudeAudio.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.ClaudeAudio;
+        else if (EngineDeepgram.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.Deepgram;
+    }
+
+    private void DeepgramKey_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _appState.Config.DeepgramApiKey = DeepgramKeyBox.Password;
     }
 
     private void UpdateCleanupDescription()
