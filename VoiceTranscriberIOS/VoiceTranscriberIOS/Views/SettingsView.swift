@@ -6,6 +6,47 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                // MARK: - Transcription Engine
+                Section {
+                    Picker("Engine", selection: $appState.config.transcriptionEngine) {
+                        ForEach(TranscriptionEngine.allCases) { engine in
+                            VStack(alignment: .leading) {
+                                Text(engine.displayName)
+                                Text(engine.subtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(engine)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } header: {
+                    Text("Transcription Engine")
+                } footer: {
+                    Text("Choose which speech-to-text service to use for transcription.")
+                }
+
+                // MARK: - Text Cleanup
+                Section {
+                    Toggle("AI Cleanup (Claude)", isOn: $appState.config.useAICleanup)
+
+                    if appState.config.useAICleanup {
+                        Text("Uses Claude Haiku for intelligent formatting. Applies dictionary, corrections, style, and smart formatting. Requires Claude API key.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text("Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("Text Cleanup")
+                } footer: {
+                    if appState.config.translationEnabled && !appState.config.useAICleanup {
+                        Text("Note: AI cleanup is forced when translation is enabled.")
+                    }
+                }
+
                 // MARK: - API Keys
                 Section {
                     APIKeyField(
@@ -24,6 +65,15 @@ struct SettingsView: View {
                             set: { appState.config.claudeAPIKey = $0.isEmpty ? nil : $0 }
                         ),
                         placeholder: "sk-ant-..."
+                    )
+
+                    APIKeyField(
+                        label: "Deepgram API Key",
+                        key: Binding(
+                            get: { appState.config.deepgramAPIKey ?? "" },
+                            set: { appState.config.deepgramAPIKey = $0.isEmpty ? nil : $0 }
+                        ),
+                        placeholder: "dg-..."
                     )
 
                     if appState.config.hasAPIKeys {

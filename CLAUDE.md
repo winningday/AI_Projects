@@ -150,7 +150,8 @@ Hub files contain only: frontmatter + summary + links to sub-docs.
 | Folder | Status | Stack | CLAUDE.md | .context/ | MEMORY.md | TODO.md |
 |--------|--------|-------|-----------|-----------|-----------|---------|
 | `VoiceTranscriberAPI/` | Active | TypeScript, Hono, Cloudflare Workers, D1 | Yes | Yes | Needed | Needed |
-| `VoiceTranscriber/` | Active | Swift, SwiftUI, GRDB, OpenAI, Anthropic | Needed | Yes | Needed | Needed |
+| `VoiceTranscriber/` | Active | Swift, SwiftUI, GRDB, OpenAI, Anthropic | Yes | Yes | Needed | Needed |
+| `VoiceTranscriberIOS/` | Active | Swift, SwiftUI, GRDB, OpenAI, Anthropic | Needed | No | Needed | Needed |
 | `instagram-assistant/` | Active | Python, Streamlit, SQLite, Claude | Needed | No | Needed | Needed |
 | `resume-maker/` | Active | Python, RenderCV, Claude API | Needed | No | Needed | Needed |
 | `video_editor/` | Active | Python, ffmpeg, Whisper, Claude Vision | Needed | No | Needed | Needed |
@@ -189,6 +190,28 @@ Before ending work:
 - **No CI/CD**: Manual builds on user's Mac (Apple Silicon). No Swift compiler on dev server.
 - **Commit often**: Small, focused commits with clear messages.
 - **Don't over-engineer**: Only make changes that are directly requested or clearly necessary.
+
+### Cross-Platform App Rule (CRITICAL)
+
+**Verbalize exists on THREE platforms: macOS, iOS, and Windows.** When making changes to any of these apps, you MUST apply the same changes to ALL related apps:
+
+| Folder | Platform | Stack |
+|--------|----------|-------|
+| `VoiceTranscriber/` | macOS | Swift, SwiftUI, AppKit |
+| `VoiceTranscriberIOS/` | iOS | Swift, SwiftUI, UIKit |
+| `VoiceTranscriber-Windows/` | Windows | C#, WPF, .NET 8 |
+
+**Before finishing any Verbalize task, check this list:**
+
+1. Did I update the **macOS** app? (`VoiceTranscriber/`)
+2. Did I update the **iOS** app? (`VoiceTranscriberIOS/`)
+3. Did I update the **Windows** app? (`VoiceTranscriber-Windows/`)
+
+**Shared code in iOS lives in `VoiceTranscriberIOS/Shared/`** — this is used by both the main app and the keyboard extension. Changes to API clients, models, config, or utils must go in `Shared/`.
+
+**The keyboard extension (`VerbalizeKeyboard/`) has its own pipeline** — if you change how transcription or cleanup works, update `KeyboardViewController.swift` too.
+
+**Do not skip a platform.** If the change is platform-specific (e.g., macOS-only Apple Speech), document why the other platforms don't need it. Otherwise, apply to all three.
 
 ## 10. Skills
 

@@ -1,5 +1,41 @@
 import Foundation
 
+/// Transcription engine choice.
+enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
+    case whisperMini = "whisper_mini"
+    case whisperFull = "whisper_full"
+    case deepgram = "deepgram"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .whisperMini: return "OpenAI Whisper (Fast)"
+        case .whisperFull: return "OpenAI Whisper (Accurate)"
+        case .deepgram: return "Deepgram Nova-2"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .whisperMini: return "gpt-4o-mini-transcribe — fast, good accuracy"
+        case .whisperFull: return "gpt-4o-transcribe — best accuracy, slightly slower"
+        case .deepgram: return "Nova-2 — very fast, great accuracy"
+        }
+    }
+
+    var requiredKeyType: RequiredKeyType {
+        switch self {
+        case .whisperMini, .whisperFull: return .openAI
+        case .deepgram: return .deepgram
+        }
+    }
+}
+
+enum RequiredKeyType {
+    case openAI, claude, deepgram, none
+}
+
 /// Style profile for different message contexts.
 enum StyleContext: String, CaseIterable, Codable, Identifiable {
     case personalMessages = "personal"

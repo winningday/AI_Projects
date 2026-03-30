@@ -140,7 +140,7 @@ struct HomeView: View {
             let aDate = a.value.first?.timestamp ?? .distantPast
             let bDate = b.value.first?.timestamp ?? .distantPast
             return aDate > bDate
-        }
+        }.map { (key: $0.key, transcripts: $0.value) }
     }
 
     private func isRecentDate(_ key: String) -> Bool {

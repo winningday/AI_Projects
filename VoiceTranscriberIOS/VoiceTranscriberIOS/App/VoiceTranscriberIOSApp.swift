@@ -45,6 +45,7 @@ final class AppState: ObservableObject {
 
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
+    private let deepgramClient = DeepgramClient()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
     private var cancellables = Set<AnyCancellable>()
 
@@ -176,12 +177,31 @@ final class AppState: ObservableObject {
         }
 
         do {
+            // Step 1: Transcribe with selected engine
             statusMessage = "Transcribing..."
-            let rawText = try await whisperClient.transcribe(
-                fileURL: url,
-                language: config.translationEnabled ? nil : "en",
-                dictionaryWords: config.dictionaryWords
-            )
+            let rawText: String
+            switch config.transcriptionEngine {
+            case .whisperMini:
+                rawText = try await whisperClient.transcribe(
+                    fileURL: url,
+                    model: "gpt-4o-mini-transcribe",
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            case .whisperFull:
+                rawText = try await whisperClient.transcribe(
+                    fileURL: url,
+                    model: "gpt-4o-transcribe",
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            case .deepgram:
+                rawText = try await deepgramClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            }
 
             guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 isProcessing = false
@@ -190,16 +210,23 @@ final class AppState: ObservableObject {
                 return
             }
 
-            statusMessage = "Cleaning up..."
-            let cleanedText = try await claudeClient.cleanTranscription(
-                rawText,
-                dictionaryWords: config.dictionaryWords,
-                styleTone: config.defaultStyleTone,
-                smartFormatting: config.smartFormatting,
-                translationEnabled: config.translationEnabled,
-                targetLanguage: config.targetLanguage,
-                recentCorrections: config.recentCorrections
-            )
+            // Step 2: Clean transcript
+            let cleanedText: String
+            let needsAICleanup = config.useAICleanup || config.translationEnabled
+            if needsAICleanup {
+                statusMessage = config.translationEnabled ? "Translating..." : "Cleaning up..."
+                cleanedText = try await claudeClient.cleanTranscription(
+                    rawText,
+                    dictionaryWords: config.dictionaryWords,
+                    styleTone: config.defaultStyleTone,
+                    smartFormatting: config.smartFormatting,
+                    translationEnabled: config.translationEnabled,
+                    targetLanguage: config.targetLanguage,
+                    recentCorrections: config.recentCorrections
+                )
+            } else {
+                cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: config.defaultStyleTone)
+            }
 
             let transcript = Transcript(
                 originalText: rawText,
