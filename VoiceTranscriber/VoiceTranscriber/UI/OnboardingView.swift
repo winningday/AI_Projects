@@ -151,6 +151,31 @@ struct OnboardingView: View {
                     NumberedStep(number: 4, text: "Make sure the toggle is ON")
                 }
                 .padding(.horizontal, 20)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HelpText("Settings loading slowly or opening the wrong page?")
+                    Text("If you've reinstalled Verbalize multiple times, stale entries can slow down System Settings. Run this in Terminal to fix it:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        Text("tccutil reset Accessibility")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: .controlBackgroundColor)))
+                        Button("Copy") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString("tccutil reset Accessibility", forType: .string)
+                        }
+                        .controlSize(.mini)
+                    }
+                    Text("This clears all Accessibility permissions — you'll need to re-add Verbalize and any other apps.")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 20)
             }
         }
         .padding(.horizontal, 40)
@@ -224,11 +249,17 @@ struct OnboardingView: View {
     }
 
     private func openAccessibilitySettings() {
-        // Open System Settings directly to the Accessibility pane.
-        // Don't call checkAccessibilityPermission() — it triggers a redundant
-        // system popup that stays behind System Settings, confusing the user.
+        // Open System Settings to Privacy & Security > Accessibility.
+        // The x-apple.systempreferences URL scheme can be slow/unreliable on macOS 13+,
+        // especially when there are stale TCC entries from reinstalls — but it's the
+        // only programmatic option. Users see a troubleshooting tip if it misbehaves.
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
+        }
+        // Poll more frequently after user clicks so the UI updates quickly once granted
+        permissionTimer?.invalidate()
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+            DispatchQueue.main.async { refreshPermissionStatus() }
         }
     }
 
