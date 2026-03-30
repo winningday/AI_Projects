@@ -37,6 +37,7 @@ final class SharedConfig: ObservableObject {
         static let openAI = "stored_openai_api_key"
         static let claude = "stored_claude_api_key"
         static let deepgram = "stored_deepgram_api_key"
+        static let mistral = "stored_mistral_api_key"
     }
 
     // MARK: - Published Properties
@@ -309,15 +310,33 @@ final class SharedConfig: ObservableObject {
         }
     }
 
+    var mistralAPIKey: String? {
+        get {
+            let stored = defaults.string(forKey: APIKeys.mistral)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["MISTRAL_API_KEY"]
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.mistral)
+            } else {
+                defaults.removeObject(forKey: APIKeys.mistral)
+            }
+            objectWillChange.send()
+        }
+    }
+
     var hasAPIKeys: Bool {
         let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
         let hasClaude = !(claudeAPIKey ?? "").isEmpty
         let hasDeepgram = !(deepgramAPIKey ?? "").isEmpty
+        let hasMistral = !(mistralAPIKey ?? "").isEmpty
 
         // Check transcription engine key requirement
         switch transcriptionEngine.requiredKeyType {
         case .openAI: if !hasOpenAI { return false }
         case .deepgram: if !hasDeepgram { return false }
+        case .mistral: if !hasMistral { return false }
         case .claude: if !hasClaude { return false }
         case .none: break
         }

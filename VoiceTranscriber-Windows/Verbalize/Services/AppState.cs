@@ -240,6 +240,7 @@ public class AppState : INotifyPropertyChanged, IDisposable
             TranscriptionEngine.WhisperMini => "gpt-4o-mini-transcribe",
             TranscriptionEngine.WhisperFull => "gpt-4o-transcribe",
             TranscriptionEngine.Deepgram => "nova-2",
+            TranscriptionEngine.Mistral => "voxtral-mini",
             _ => "gpt-4o-mini-transcribe"
         };
 
@@ -257,6 +258,10 @@ public class AppState : INotifyPropertyChanged, IDisposable
                 break;
             case TranscriptionEngine.Deepgram:
                 rawText = await DeepgramClient.TranscribeAsync(filePath, Config.DeepgramApiKey,
+                    dictionaryWords, languageHint);
+                break;
+            case TranscriptionEngine.Mistral:
+                rawText = await MistralClient.TranscribeAsync(filePath, Config.MistralApiKey,
                     dictionaryWords, languageHint);
                 break;
             default:

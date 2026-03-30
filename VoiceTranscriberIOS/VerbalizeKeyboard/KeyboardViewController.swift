@@ -13,6 +13,7 @@ class KeyboardViewController: UIInputViewController {
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
     private let deepgramClient = DeepgramClient()
+    private let mistralClient = MistralClient()
     private let audioRecorder = AudioRecorderIOS()
     private lazy var correctionTracker = CorrectionTracker()
 
@@ -228,6 +229,12 @@ class KeyboardViewController: UIInputViewController {
                 )
             case .deepgram:
                 rawText = try await deepgramClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            case .mistral:
+                rawText = try await mistralClient.transcribe(
                     fileURL: url,
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords

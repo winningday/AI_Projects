@@ -11,9 +11,11 @@ struct AppSettingsView: View {
     @State private var openAIKey = ""
     @State private var claudeKey = ""
     @State private var deepgramKey = ""
+    @State private var mistralKey = ""
     @State private var showOpenAIKey = false
     @State private var showClaudeKey = false
     @State private var showDeepgramKey = false
+    @State private var showMistralKey = false
     @State private var isCapturingHotkey = false
     @State private var showSavedAlert = false
     @State private var showDeleteConfirm = false
@@ -263,12 +265,21 @@ struct AppSettingsView: View {
                         isSaved: !(config.deepgramAPIKey ?? "").isEmpty,
                         link: ("console.deepgram.com", "https://console.deepgram.com")
                     )
+                    APIKeyField(
+                        label: "Mistral",
+                        placeholder: "...",
+                        key: $mistralKey,
+                        showKey: $showMistralKey,
+                        isSaved: !(config.mistralAPIKey ?? "").isEmpty,
+                        link: ("console.mistral.ai", "https://console.mistral.ai/api-keys")
+                    )
 
                     HStack {
                         Button("Save API Keys") {
                             config.openAIAPIKey = openAIKey.isEmpty ? nil : openAIKey
                             config.claudeAPIKey = claudeKey.isEmpty ? nil : claudeKey
                             config.deepgramAPIKey = deepgramKey.isEmpty ? nil : deepgramKey
+                            config.mistralAPIKey = mistralKey.isEmpty ? nil : mistralKey
                             showSavedAlert = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -426,6 +437,7 @@ struct AppSettingsView: View {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
             deepgramKey = config.deepgramAPIKey ?? ""
+            mistralKey = config.mistralAPIKey ?? ""
             refreshPermissions()
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {

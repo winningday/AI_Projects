@@ -35,6 +35,7 @@ public partial class SettingsPage : Page
             case TranscriptionEngine.WhisperMini: EngineWhisperMini.IsChecked = true; break;
             case TranscriptionEngine.WhisperFull: EngineWhisperFull.IsChecked = true; break;
             case TranscriptionEngine.Deepgram: EngineDeepgram.IsChecked = true; break;
+            case TranscriptionEngine.Mistral: EngineMistral.IsChecked = true; break;
             default: EngineWhisperMini.IsChecked = true; break;
         }
 
@@ -60,6 +61,8 @@ public partial class SettingsPage : Page
             AnthropicKeyBox.Password = _appState.Config.AnthropicApiKey;
         if (!string.IsNullOrEmpty(_appState.Config.DeepgramApiKey))
             DeepgramKeyBox.Password = _appState.Config.DeepgramApiKey;
+        if (!string.IsNullOrEmpty(_appState.Config.MistralApiKey))
+            MistralKeyBox.Password = _appState.Config.MistralApiKey;
 
         _loading = false;
     }
@@ -150,12 +153,20 @@ public partial class SettingsPage : Page
             _appState.Config.TranscriptionEngine = TranscriptionEngine.WhisperFull;
         else if (EngineDeepgram.IsChecked == true)
             _appState.Config.TranscriptionEngine = TranscriptionEngine.Deepgram;
+        else if (EngineMistral.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.Mistral;
     }
 
     private void DeepgramKey_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
         _appState.Config.DeepgramApiKey = DeepgramKeyBox.Password;
+    }
+
+    private void MistralKey_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _appState.Config.MistralApiKey = MistralKeyBox.Password;
     }
 
     private void UpdateCleanupDescription()

@@ -46,6 +46,7 @@ final class AppState: ObservableObject {
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
     private let deepgramClient = DeepgramClient()
+    private let mistralClient = MistralClient()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
     private var cancellables = Set<AnyCancellable>()
 
@@ -204,6 +205,12 @@ final class AppState: ObservableObject {
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords
                 )
+            case .mistral:
+                rawText = try await mistralClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
             }
             let transcribeMs = Int((CFAbsoluteTimeGetCurrent() - transcribeStart) * 1000)
             let sttModel: String = {
@@ -211,6 +218,7 @@ final class AppState: ObservableObject {
                 case .whisperMini: return "gpt-4o-mini-transcribe"
                 case .whisperFull: return "gpt-4o-transcribe"
                 case .deepgram: return "nova-2"
+                case .mistral: return "voxtral-mini"
                 }
             }()
 

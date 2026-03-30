@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
     private let deepgramClient = DeepgramClient()
+    private let mistralClient = MistralClient()
     private let appleSpeechClient = AppleSpeechClient()
     private let recordingWindow = RecordingWindowController()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
@@ -283,6 +284,12 @@ final class AppState: ObservableObject {
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords
                 )
+            case .mistral:
+                rawText = try await mistralClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
             case .appleSpeech:
                 rawText = try await appleSpeechClient.transcribe(fileURL: url)
             }
@@ -292,6 +299,7 @@ final class AppState: ObservableObject {
                 case .whisperMini: return "gpt-4o-mini-transcribe"
                 case .whisperFull: return "gpt-4o-transcribe"
                 case .deepgram: return "nova-2"
+                case .mistral: return "voxtral-mini"
                 case .appleSpeech: return "apple-speech"
                 }
             }()

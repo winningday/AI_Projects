@@ -5,6 +5,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case whisperMini = "whisper_mini"
     case whisperFull = "whisper_full"
     case deepgram = "deepgram"
+    case mistral = "mistral"
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         case .whisperMini: return "OpenAI Whisper (Fast)"
         case .whisperFull: return "OpenAI Whisper (Accurate)"
         case .deepgram: return "Deepgram Nova-2"
+        case .mistral: return "Mistral Voxtral"
         }
     }
 
@@ -21,6 +23,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         case .whisperMini: return "gpt-4o-mini-transcribe — fast, good accuracy"
         case .whisperFull: return "gpt-4o-transcribe — best accuracy, slightly slower"
         case .deepgram: return "Nova-2 — very fast, great accuracy"
+        case .mistral: return "Voxtral Mini — fast, accurate, $0.003/min"
         }
     }
 
@@ -28,12 +31,13 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .whisperMini, .whisperFull: return .openAI
         case .deepgram: return .deepgram
+        case .mistral: return .mistral
         }
     }
 }
 
 enum RequiredKeyType {
-    case openAI, claude, deepgram, none
+    case openAI, claude, deepgram, mistral, none
 }
 
 /// Style profile for different message contexts.
