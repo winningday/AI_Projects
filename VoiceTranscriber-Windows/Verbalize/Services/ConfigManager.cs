@@ -141,6 +141,13 @@ public class ConfigManager
         set { _data.HasCompletedOnboarding = value; Save(); }
     }
 
+    // AI cleanup toggle (default: false — uses fast programmatic cleanup)
+    public bool UseAICleanup
+    {
+        get => _data.UseAICleanup;
+        set { _data.UseAICleanup = value; Save(); }
+    }
+
     public ConfigManager()
     {
         Load();
@@ -281,5 +288,6 @@ public class ConfigManager
         public int TotalWords { get; set; }
         public double TotalRecordingTime { get; set; }
         public bool HasCompletedOnboarding { get; set; } = false;
+        public bool UseAICleanup { get; set; } = false;
     }
 }

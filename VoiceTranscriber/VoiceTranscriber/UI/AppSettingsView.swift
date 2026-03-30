@@ -128,8 +128,55 @@ struct AppSettingsView: View {
                         .italic()
                 }
 
-                // Extras section
-                SettingsSection(title: "Intelligence", icon: "sparkles") {
+                // Transcription Engine section
+                SettingsSection(title: "Transcription Engine", icon: "waveform") {
+                    Picker("Engine", selection: $config.transcriptionEngine) {
+                        ForEach(TranscriptionEngine.allCases) { engine in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(engine.displayName)
+                                Text(engine.subtitle)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(engine)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+
+                    if config.transcriptionEngine == .appleSpeech {
+                        Text("Uses Apple's on-device speech recognition. Free, fast, no API key needed. Works offline.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Uses OpenAI's cloud transcription. Requires an OpenAI API key. Supports dictionary hints for better accuracy with names and technical terms.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // Text Cleanup section
+                SettingsSection(title: "Text Cleanup", icon: "sparkles") {
+                    Toggle(isOn: $config.useAICleanup) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use AI cleanup (Claude)")
+                            Text("Sends transcript to Claude for advanced cleanup. May occasionally modify your words.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if !config.useAICleanup {
+                        Text("Using fast programmatic cleanup: capitalizes sentences, adds punctuation, removes filler words (um, uh), and fixes stutters. Your words are never changed.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("AI cleanup uses Claude Haiku for intelligent formatting, self-correction handling, and context-aware styling. Requires a Claude API key.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                    }
+
+                    Divider()
+
                     Toggle("Smart formatting (code, technical terms)", isOn: $config.smartFormatting)
                     Toggle("Auto-add corrected words to dictionary", isOn: $config.autoAddToDictionary)
                     Toggle("Context awareness (read surrounding text for accuracy)", isOn: $config.contextAwareness)
@@ -188,6 +235,18 @@ struct AppSettingsView: View {
 
                 // API Keys section
                 SettingsSection(title: "API Keys", icon: "key") {
+                    if config.transcriptionEngine == .appleSpeech && !config.useAICleanup && !config.translationEnabled {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 12))
+                            Text("No API keys needed — using fully on-device pipeline!")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.bottom, 4)
+                    }
+
                     APIKeyField(
                         label: "OpenAI",
                         placeholder: "sk-proj-...",

@@ -2,6 +2,28 @@ import Foundation
 import Security
 import ServiceManagement
 
+/// Transcription engine choice.
+enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
+    case whisper = "whisper"
+    case appleSpeech = "apple_speech"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .whisper: return "OpenAI Whisper"
+        case .appleSpeech: return "Apple Speech (On-Device)"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .whisper: return "Cloud-based, requires API key"
+        case .appleSpeech: return "Free, fast, no API key needed"
+        }
+    }
+}
+
 /// Style profile for different message contexts.
 enum StyleContext: String, CaseIterable, Codable, Identifiable {
     case personalMessages = "personal"
@@ -122,6 +144,8 @@ final class ConfigManager: ObservableObject {
         static let targetLanguage = "targetLanguage"
         static let typingSpeed = "typingSpeed"
         static let corrections = "corrections"
+        static let useAICleanup = "useAICleanup"
+        static let transcriptionEngine = "transcriptionEngine"
     }
 
     // MARK: - API Key Storage Keys
@@ -191,6 +215,16 @@ final class ConfigManager: ObservableObject {
     /// User's estimated typing speed in WPM (used for productivity comparisons)
     @Published var typingSpeed: Int {
         didSet { defaults.set(typingSpeed, forKey: Keys.typingSpeed) }
+    }
+
+    /// Whether to use Claude AI for transcript cleanup (default: false — uses programmatic cleanup)
+    @Published var useAICleanup: Bool {
+        didSet { defaults.set(useAICleanup, forKey: Keys.useAICleanup) }
+    }
+
+    /// Which transcription engine to use (Whisper or Apple Speech)
+    @Published var transcriptionEngine: TranscriptionEngine {
+        didSet { defaults.set(transcriptionEngine.rawValue, forKey: Keys.transcriptionEngine) }
     }
 
     static let supportedLanguages: [(code: String, name: String)] = [
@@ -281,6 +315,13 @@ final class ConfigManager: ObservableObject {
         self.targetLanguage = defaults.string(forKey: Keys.targetLanguage) ?? "en"
         let savedTypingSpeed = defaults.integer(forKey: Keys.typingSpeed)
         self.typingSpeed = savedTypingSpeed > 0 ? savedTypingSpeed : 40
+        self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? false
+        if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
+           let engine = TranscriptionEngine(rawValue: engineRaw) {
+            self.transcriptionEngine = engine
+        } else {
+            self.transcriptionEngine = .whisper
+        }
 
         // Load dictionary
         if let data = defaults.data(forKey: Keys.dictionaryEntries),
@@ -466,9 +507,17 @@ final class ConfigManager: ObservableObject {
         }
     }
 
+    /// Whether required API keys are configured for the current engine/cleanup settings.
     var hasAPIKeys: Bool {
-        openAIAPIKey != nil && claudeAPIKey != nil &&
-        !(openAIAPIKey?.isEmpty ?? true) && !(claudeAPIKey?.isEmpty ?? true)
+        let needsOpenAI = transcriptionEngine == .whisper
+        let needsClaude = useAICleanup || translationEnabled
+
+        let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
+        let hasClaude = !(claudeAPIKey ?? "").isEmpty
+
+        if needsOpenAI && !hasOpenAI { return false }
+        if needsClaude && !hasClaude { return false }
+        return true
     }
 
     // MARK: - Simple Obfuscation (base64 encoding to avoid plain-text in plist)

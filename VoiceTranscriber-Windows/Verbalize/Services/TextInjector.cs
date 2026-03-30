@@ -47,9 +47,20 @@ public static class TextInjector
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_V = 0x56;
 
+    // Track whether we recently injected text (to add space between consecutive injections)
+    private static DateTime _lastInjectionTime = DateTime.MinValue;
+
     public static async Task InjectTextAsync(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
+
+        // Prepend space if we recently injected text (within 30 seconds)
+        // This prevents consecutive transcriptions from running together
+        var textToInject = text;
+        if ((DateTime.UtcNow - _lastInjectionTime).TotalSeconds < 30)
+        {
+            textToInject = " " + textToInject;
+        }
 
         // Save current clipboard
         string? previousClipboard = null;
@@ -61,7 +72,7 @@ public static class TextInjector
         catch { /* clipboard may be locked */ }
 
         // Set our text to clipboard
-        Clipboard.SetText(text);
+        Clipboard.SetText(textToInject);
         await Task.Delay(50);
 
         // Simulate Ctrl+V
@@ -78,6 +89,7 @@ public static class TextInjector
         };
 
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        _lastInjectionTime = DateTime.UtcNow;
 
         // Restore clipboard after delay
         await Task.Delay(500);

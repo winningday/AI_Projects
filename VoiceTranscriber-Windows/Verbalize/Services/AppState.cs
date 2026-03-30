@@ -134,10 +134,17 @@ public class AppState : INotifyPropertyChanged, IDisposable
     {
         ErrorMessage = null;
 
-        // Validate API keys
+        // Validate API keys (only require what's needed for current settings)
         if (string.IsNullOrEmpty(Config.OpenAIApiKey))
         {
             ErrorMessage = "OpenAI API key not set. Go to Settings to configure.";
+            Status = AppStatus.Error;
+            return;
+        }
+
+        if (Config.UseAICleanup && string.IsNullOrEmpty(Config.AnthropicApiKey))
+        {
+            ErrorMessage = "Claude API key not set but AI cleanup is enabled. Go to Settings to configure, or disable AI cleanup.";
             Status = AppStatus.Error;
             return;
         }
@@ -228,10 +235,11 @@ public class AppState : INotifyPropertyChanged, IDisposable
             tone = Config.GetStyleForContext(context);
         }
 
-        // Step 3: Clean with Claude (if API key is set)
+        // Step 3: Clean transcript
         string cleanedText;
-        if (!string.IsNullOrEmpty(Config.AnthropicApiKey))
+        if (Config.UseAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
         {
+            // AI cleanup via Claude (opt-in — can hallucinate on short/question-like input)
             cleanedText = await ClaudeClient.CleanTranscriptionAsync(
                 rawText,
                 Config.AnthropicApiKey,
@@ -245,7 +253,8 @@ public class AppState : INotifyPropertyChanged, IDisposable
         }
         else
         {
-            cleanedText = rawText;
+            // Programmatic cleanup (default — fast, deterministic, no hallucination)
+            cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
         }
 
         // Step 4: Save transcript

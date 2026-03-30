@@ -57,11 +57,23 @@
                 </StackPanel>
             </Border>
 
-            <!-- Intelligence -->
+            <!-- Text Cleanup -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Intelligence" FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" />
+                    <TextBlock Text="Text Cleanup" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="How transcribed text is cleaned up before pasting" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12" />
+
+                    <CheckBox x:Name="UseAICleanupCheck" Content="Use AI cleanup (Claude Haiku)"
+                              Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                              Margin="0,0,0,4" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+                    <TextBlock x:Name="CleanupDescription"
+                               Text="Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed."
+                               FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                               Margin="20,0,0,12" TextWrapping="Wrap" />
+
+                    <Separator Margin="0,4,0,12" />
 
                     <CheckBox x:Name="ContextAwarenessCheck" Content="Context awareness (detect active app)"
                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
