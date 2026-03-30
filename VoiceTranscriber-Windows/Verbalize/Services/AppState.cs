@@ -220,6 +220,7 @@ public class AppState : INotifyPropertyChanged, IDisposable
 
     private async Task ProcessRecordingAsync(string filePath, double duration)
     {
+        var pipelineStart = System.Diagnostics.Stopwatch.StartNew();
         var dictionaryWords = Config.DictionaryEntries.Select(e => e.Word).ToList();
         var languageHint = Config.TranslationEnabled ? null : "en";
 
@@ -234,7 +235,16 @@ public class AppState : INotifyPropertyChanged, IDisposable
         string rawText;
         string cleanedText;
 
+        var sttModel = Config.TranscriptionEngine switch
+        {
+            TranscriptionEngine.WhisperMini => "gpt-4o-mini-transcribe",
+            TranscriptionEngine.WhisperFull => "gpt-4o-transcribe",
+            TranscriptionEngine.Deepgram => "nova-2",
+            _ => "gpt-4o-mini-transcribe"
+        };
+
         // Step 1: Transcribe with selected engine
+        var transcribeTimer = System.Diagnostics.Stopwatch.StartNew();
         switch (Config.TranscriptionEngine)
         {
             case TranscriptionEngine.WhisperMini:
@@ -254,14 +264,20 @@ public class AppState : INotifyPropertyChanged, IDisposable
                     dictionaryWords, languageHint);
                 break;
         }
+        transcribeTimer.Stop();
+        var transcribeMs = (int)transcribeTimer.ElapsedMilliseconds;
 
         if (string.IsNullOrWhiteSpace(rawText))
         {
+            PipelineLogger.Log(Config.TranscriptionEngine.DisplayName(), sttModel, transcribeMs, 0, "none", "", duration, 0, error: "No speech detected");
             Status = AppStatus.Idle;
             return;
         }
 
         // Step 2: Clean transcript
+        var cleanupTimer = System.Diagnostics.Stopwatch.StartNew();
+        string cleanupMethod;
+        string cleanupModel;
         var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
         if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
         {
@@ -269,14 +285,21 @@ public class AppState : INotifyPropertyChanged, IDisposable
                 rawText, Config.AnthropicApiKey, tone, dictionaryWords,
                 Config.Corrections, null, _capturedAppName,
                 Config.TranslationEnabled, Config.TargetLanguage);
+            cleanupMethod = "claude";
+            cleanupModel = "claude-haiku-4-5";
         }
         else
         {
             cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
+            cleanupMethod = "programmatic";
+            cleanupModel = "none";
         }
+        cleanupTimer.Stop();
+        var cleanupMs = (int)cleanupTimer.ElapsedMilliseconds;
 
         if (string.IsNullOrWhiteSpace(cleanedText))
         {
+            PipelineLogger.Log(Config.TranscriptionEngine.DisplayName(), sttModel, transcribeMs, cleanupMs, cleanupMethod, cleanupModel, duration, 0, error: "Empty after cleanup");
             Status = AppStatus.Idle;
             return;
         }
@@ -300,6 +323,10 @@ public class AppState : INotifyPropertyChanged, IDisposable
             await TextInjector.InjectTextAsync(cleanedText);
             CorrectionTracker.StartTracking(cleanedText);
         }
+
+        pipelineStart.Stop();
+        var totalMs = (int)pipelineStart.ElapsedMilliseconds;
+        PipelineLogger.Log(Config.TranscriptionEngine.DisplayName(), sttModel, transcribeMs, cleanupMs, cleanupMethod, cleanupModel, duration, transcript.WordCount, totalMs: totalMs);
 
         LastTranscript = cleanedText;
         Status = AppStatus.Idle;

@@ -312,6 +312,69 @@ struct AppSettingsView: View {
                     .controlSize(.small)
                 }
 
+                // Performance Log section
+                SettingsSection(title: "Performance Log", icon: "gauge.with.dots.needle.33percent") {
+                    let entries = PipelineLogger.shared.recentEntries(count: 10)
+                    if entries.isEmpty {
+                        Text("No transcriptions logged yet. Use the app to see timing data here.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(entries) { entry in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(entry.timestamp)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    if entry.error != nil {
+                                        Text("FAILED")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.red)
+                                    } else {
+                                        Text("\(entry.totalMs)ms total")
+                                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                            .foregroundColor(entry.totalMs < 2000 ? .green : entry.totalMs < 4000 ? .orange : .red)
+                                    }
+                                }
+                                if let error = entry.error {
+                                    Text(error)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.red)
+                                } else {
+                                    HStack(spacing: 12) {
+                                        Label("\(entry.transcribeMs)ms", systemImage: "waveform")
+                                        Label("\(entry.cleanupMs)ms", systemImage: entry.cleanupMethod == "claude" ? "sparkles" : "text.badge.checkmark")
+                                        Text("\(entry.wordCount)w")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .font(.system(size: 11))
+                                    if !entry.sttModel.isEmpty || !entry.cleanupModel.isEmpty {
+                                        HStack(spacing: 8) {
+                                            if !entry.sttModel.isEmpty {
+                                                Text("STT: \(entry.sttModel)")
+                                            }
+                                            if !entry.cleanupModel.isEmpty {
+                                                Text("Cleanup: \(entry.cleanupModel)")
+                                            }
+                                        }
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+
+                        Divider()
+
+                        Button("Open Full Log (CSV)") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: PipelineLogger.shared.logFilePath))
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
                 // Uninstall section
                 SettingsSection(title: "Clean Uninstall", icon: "trash") {
                     Text("To completely remove Verbalize and all its data:")
