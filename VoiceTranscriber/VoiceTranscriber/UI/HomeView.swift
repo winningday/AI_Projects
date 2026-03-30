@@ -87,20 +87,28 @@ struct HomeView: View {
 
                 // Transcript list section
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(sectionHeaderText)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                            .tracking(0.5)
-                        Spacer()
-                    }
-
                     if appState.database.transcripts.isEmpty {
                         EmptyTranscriptsView(hotkeyDescription: appState.hotkeyDescription)
                     } else {
-                        LazyVStack(spacing: 1) {
-                            ForEach(appState.database.transcripts.prefix(50)) { transcript in
-                                TranscriptRow(transcript: transcript)
+                        ForEach(groupedTranscripts, id: \.key) { group in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(group.key.uppercased())
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                        .tracking(0.5)
+                                    Text("(\(group.transcripts.count))")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                                    Spacer()
+                                }
+                                .padding(.top, 8)
+
+                                LazyVStack(spacing: 1) {
+                                    ForEach(group.transcripts) { transcript in
+                                        TranscriptRow(transcript: transcript, showDate: !isRecentDate(group.key))
+                                    }
+                                }
                             }
                         }
                     }
@@ -111,12 +119,32 @@ struct HomeView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private var sectionHeaderText: String {
-        let today = appState.database.transcripts.filter {
-            Calendar.current.isDateInToday($0.timestamp)
-        }.count
-        if today > 0 { return "TODAY (\(today))" }
-        return "RECENT"
+    private var groupedTranscripts: [(key: String, transcripts: [Transcript])] {
+        let calendar = Calendar.current
+        let dateFmt = DateFormatter()
+        dateFmt.dateStyle = .medium
+
+        let recent = Array(appState.database.transcripts.prefix(50))
+        let grouped = Dictionary(grouping: recent) { transcript -> String in
+            if calendar.isDateInToday(transcript.timestamp) { return "Today" }
+            if calendar.isDateInYesterday(transcript.timestamp) { return "Yesterday" }
+            return dateFmt.string(from: transcript.timestamp)
+        }
+
+        // Sort: Today first, Yesterday second, then by most recent date
+        return grouped.sorted { a, b in
+            let order = ["Today": 0, "Yesterday": 1]
+            let aOrder = order[a.key] ?? 2
+            let bOrder = order[b.key] ?? 2
+            if aOrder != bOrder { return aOrder < bOrder }
+            let aDate = a.value.first?.timestamp ?? .distantPast
+            let bDate = b.value.first?.timestamp ?? .distantPast
+            return aDate > bDate
+        }
+    }
+
+    private func isRecentDate(_ key: String) -> Bool {
+        key == "Today" || key == "Yesterday"
     }
 
     private func formatNumber(_ count: Int) -> String {
@@ -237,6 +265,7 @@ private struct EmptyTranscriptsView: View {
 
 private struct TranscriptRow: View {
     let transcript: Transcript
+    var showDate: Bool = false
     @State private var isHovered = false
 
     var body: some View {
@@ -251,7 +280,7 @@ private struct TranscriptRow: View {
                     .font(.system(size: 9))
                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
             }
-            .frame(width: 60, alignment: .trailing)
+            .frame(width: showDate ? 110 : 60, alignment: .trailing)
 
             // Divider dot
             Circle()
@@ -291,7 +320,11 @@ private struct TranscriptRow: View {
 
     private var timeString: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        if showDate {
+            formatter.dateFormat = "MMM d, h:mm a"
+        } else {
+            formatter.dateFormat = "h:mm a"
+        }
         return formatter.string(from: transcript.timestamp)
     }
 

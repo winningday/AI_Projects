@@ -10,8 +10,10 @@ struct AppSettingsView: View {
 
     @State private var openAIKey = ""
     @State private var claudeKey = ""
+    @State private var deepgramKey = ""
     @State private var showOpenAIKey = false
     @State private var showClaudeKey = false
+    @State private var showDeepgramKey = false
     @State private var isCapturingHotkey = false
     @State private var showSavedAlert = false
     @State private var showDeleteConfirm = false
@@ -128,8 +130,45 @@ struct AppSettingsView: View {
                         .italic()
                 }
 
-                // Extras section
-                SettingsSection(title: "Intelligence", icon: "sparkles") {
+                // Transcription Engine section
+                SettingsSection(title: "Transcription Engine", icon: "waveform") {
+                    Picker("Engine", selection: $config.transcriptionEngine) {
+                        ForEach(TranscriptionEngine.allCases) { engine in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(engine.displayName)
+                                Text(engine.subtitle)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(engine)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                }
+
+                // Text Cleanup section
+                SettingsSection(title: "Text Cleanup", icon: "sparkles") {
+                    Toggle(isOn: $config.useAICleanup) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use AI cleanup (Claude)")
+                            Text("Sends transcript to Claude for advanced cleanup. May occasionally modify your words.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if !config.useAICleanup {
+                        Text("Using fast programmatic cleanup: capitalizes sentences, adds punctuation, removes filler words (um, uh), and fixes stutters. Your words are never changed.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("AI cleanup uses Claude Haiku for intelligent formatting, self-correction handling, and context-aware styling. Requires a Claude API key.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                    }
+
+                    Divider()
+
                     Toggle("Smart formatting (code, technical terms)", isOn: $config.smartFormatting)
                     Toggle("Auto-add corrected words to dictionary", isOn: $config.autoAddToDictionary)
                     Toggle("Context awareness (read surrounding text for accuracy)", isOn: $config.contextAwareness)
@@ -188,6 +227,18 @@ struct AppSettingsView: View {
 
                 // API Keys section
                 SettingsSection(title: "API Keys", icon: "key") {
+                    if config.transcriptionEngine == .appleSpeech && !config.useAICleanup && !config.translationEnabled {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 12))
+                            Text("No API keys needed — using fully on-device pipeline!")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.bottom, 4)
+                    }
+
                     APIKeyField(
                         label: "OpenAI",
                         placeholder: "sk-proj-...",
@@ -204,11 +255,20 @@ struct AppSettingsView: View {
                         isSaved: !(config.claudeAPIKey ?? "").isEmpty,
                         link: ("console.anthropic.com", "https://console.anthropic.com/settings/keys")
                     )
+                    APIKeyField(
+                        label: "Deepgram",
+                        placeholder: "dg-...",
+                        key: $deepgramKey,
+                        showKey: $showDeepgramKey,
+                        isSaved: !(config.deepgramAPIKey ?? "").isEmpty,
+                        link: ("console.deepgram.com", "https://console.deepgram.com")
+                    )
 
                     HStack {
                         Button("Save API Keys") {
                             config.openAIAPIKey = openAIKey.isEmpty ? nil : openAIKey
                             config.claudeAPIKey = claudeKey.isEmpty ? nil : claudeKey
+                            config.deepgramAPIKey = deepgramKey.isEmpty ? nil : deepgramKey
                             showSavedAlert = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -302,6 +362,7 @@ struct AppSettingsView: View {
         .onAppear {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
+            deepgramKey = config.deepgramAPIKey ?? ""
             refreshPermissions()
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {

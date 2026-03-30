@@ -141,6 +141,27 @@ public class ConfigManager
         set { _data.HasCompletedOnboarding = value; Save(); }
     }
 
+    // AI cleanup toggle (default: true — uses Claude for intelligent formatting)
+    public bool UseAICleanup
+    {
+        get => _data.UseAICleanup;
+        set { _data.UseAICleanup = value; Save(); }
+    }
+
+    // Transcription engine
+    public TranscriptionEngine TranscriptionEngine
+    {
+        get => _data.TranscriptionEngine;
+        set { _data.TranscriptionEngine = value; Save(); }
+    }
+
+    // Deepgram API key
+    public string DeepgramApiKey
+    {
+        get => Deobfuscate(_data.DeepgramApiKeyObf);
+        set { _data.DeepgramApiKeyObf = Obfuscate(value); Save(); }
+    }
+
     public ConfigManager()
     {
         Load();
@@ -281,5 +302,8 @@ public class ConfigManager
         public int TotalWords { get; set; }
         public double TotalRecordingTime { get; set; }
         public bool HasCompletedOnboarding { get; set; } = false;
+        public bool UseAICleanup { get; set; } = true;
+        public TranscriptionEngine TranscriptionEngine { get; set; } = TranscriptionEngine.WhisperMini;
+        public string DeepgramApiKeyObf { get; set; } = "";
     }
 }

@@ -8,76 +8,54 @@ struct TranscriptHistoryView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
+        GeometryReader { geo in
+            let isCompact = geo.size.width < 600
+
+            if isCompact {
+                // Single-column layout for narrow windows
+                compactLayout
+            } else {
+                // Split view for wider windows
+                splitLayout
+            }
+        }
+        .frame(minWidth: 400, minHeight: 350)
+        .alert("Clear All Transcripts", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete All", role: .destructive) {
+                try? database.deleteAll()
+                selectedTranscript = nil
+            }
+        } message: {
+            Text("This will permanently delete all transcript history. This cannot be undone.")
+        }
+    }
+
+    // MARK: - Split Layout (wide)
+
+    private var splitLayout: some View {
         NavigationSplitView {
-            VStack(spacing: 0) {
-                // Search bar
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 12))
-                    TextField("Search transcripts...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
+            transcriptListView
+                .frame(minWidth: 220)
+                .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        HStack(spacing: 4) {
+                            Text("\(filteredTranscripts.count)")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundColor(.secondary)
-                                .font(.system(size: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(nsColor: .controlBackgroundColor))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
 
-                Divider()
-
-                if filteredTranscripts.isEmpty {
-                    emptyState
-                } else {
-                    List(filteredTranscripts, selection: $selectedTranscript) { transcript in
-                        TranscriptRowView(transcript: transcript)
-                            .tag(transcript)
-                            .contextMenu {
-                                Button("Copy Cleaned Text") {
-                                    copyToClipboard(transcript.cleanedText)
-                                }
-                                Button("Copy Original Text") {
-                                    copyToClipboard(transcript.originalText)
-                                }
-                                Divider()
-                                Button("Delete", role: .destructive) {
-                                    try? database.delete(transcript)
-                                    if selectedTranscript?.id == transcript.id {
-                                        selectedTranscript = nil
-                                    }
-                                }
+                            Button(action: { showDeleteConfirmation = true }) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 12))
                             }
-                    }
-                    .listStyle(.sidebar)
-                }
-            }
-            .frame(minWidth: 260)
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    HStack(spacing: 4) {
-                        Text("\(filteredTranscripts.count)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
-
-                        Button(action: { showDeleteConfirmation = true }) {
-                            Image(systemName: "trash")
-                                .font(.system(size: 12))
+                            .disabled(database.transcripts.isEmpty)
+                            .help("Clear all transcripts")
                         }
-                        .disabled(database.transcripts.isEmpty)
-                        .help("Clear all transcripts")
                     }
                 }
-            }
         } detail: {
             if let transcript = selectedTranscript {
                 TranscriptDetailView(transcript: transcript)
@@ -96,7 +74,6 @@ struct TranscriptHistoryView: View {
                 }
             }
         }
-        .frame(minWidth: 650, minHeight: 420)
         .alert("Clear All Transcripts", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete All", role: .destructive) {
@@ -105,6 +82,121 @@ struct TranscriptHistoryView: View {
             }
         } message: {
             Text("This will permanently delete all transcript history. This cannot be undone.")
+        }
+    }
+
+    // MARK: - Compact Layout (narrow window)
+
+    private var compactLayout: some View {
+        VStack(spacing: 0) {
+            if let transcript = selectedTranscript {
+                // Show detail with back button
+                HStack {
+                    Button(action: { selectedTranscript = nil }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 13))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color(nsColor: .controlBackgroundColor))
+
+                Divider()
+
+                TranscriptDetailView(transcript: transcript)
+            } else {
+                // Show list
+                transcriptListView
+                    .toolbar {
+                        ToolbarItem(placement: .automatic) {
+                            HStack(spacing: 4) {
+                                Text("\(filteredTranscripts.count)")
+                                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
+
+                                Button(action: { showDeleteConfirmation = true }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 12))
+                                }
+                                .disabled(database.transcripts.isEmpty)
+                                .help("Clear all transcripts")
+                            }
+                        }
+                    }
+            }
+        }
+        .alert("Clear All Transcripts", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete All", role: .destructive) {
+                try? database.deleteAll()
+                selectedTranscript = nil
+            }
+        } message: {
+            Text("This will permanently delete all transcript history. This cannot be undone.")
+        }
+    }
+
+    // MARK: - Shared Transcript List
+
+    private var transcriptListView: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 12))
+                TextField("Search transcripts...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(nsColor: .controlBackgroundColor))
+
+            Divider()
+
+            if filteredTranscripts.isEmpty {
+                emptyState
+            } else {
+                List(filteredTranscripts, selection: $selectedTranscript) { transcript in
+                    TranscriptRowView(transcript: transcript)
+                        .tag(transcript)
+                        .contextMenu {
+                            Button("Copy Cleaned Text") {
+                                copyToClipboard(transcript.cleanedText)
+                            }
+                            Button("Copy Original Text") {
+                                copyToClipboard(transcript.originalText)
+                            }
+                            Divider()
+                            Button("Delete", role: .destructive) {
+                                try? database.delete(transcript)
+                                if selectedTranscript?.id == transcript.id {
+                                    selectedTranscript = nil
+                                }
+                            }
+                        }
+                }
+                .listStyle(.sidebar)
+            }
         }
     }
 

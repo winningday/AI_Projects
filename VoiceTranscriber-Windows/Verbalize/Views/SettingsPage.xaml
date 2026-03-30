@@ -57,11 +57,63 @@
                 </StackPanel>
             </Border>
 
-            <!-- Intelligence -->
+            <!-- Transcription Engine -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Text="Intelligence" FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" />
+                    <TextBlock Text="Transcription Engine" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="Choose which speech-to-text engine to use" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12" />
+
+                    <RadioButton x:Name="EngineWhisperMini" GroupName="Engine"
+                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                 Margin="0,0,0,2" Checked="Engine_Changed">
+                        <StackPanel>
+                            <TextBlock Text="OpenAI Whisper (Fast)" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="gpt-4o-mini-transcribe — fast, good accuracy" FontSize="11"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+
+                    <RadioButton x:Name="EngineWhisperFull" GroupName="Engine"
+                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                 Margin="0,6,0,2" Checked="Engine_Changed">
+                        <StackPanel>
+                            <TextBlock Text="OpenAI Whisper (Accurate)" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="gpt-4o-transcribe — best accuracy, slightly slower" FontSize="11"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+
+                    <RadioButton x:Name="EngineDeepgram" GroupName="Engine"
+                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                 Margin="0,6,0,0" Checked="Engine_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Deepgram Nova-2" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="Nova-2 — very fast, great accuracy" FontSize="11"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </Border>
+
+            <!-- Text Cleanup -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Text Cleanup" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Text="How transcribed text is cleaned up before pasting" FontSize="12"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12" />
+
+                    <CheckBox x:Name="UseAICleanupCheck" Content="Use AI cleanup (Claude Haiku)"
+                              Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                              Margin="0,0,0,4" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+                    <TextBlock x:Name="CleanupDescription"
+                               Text="Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed."
+                               FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                               Margin="20,0,0,12" TextWrapping="Wrap" />
+
+                    <Separator Margin="0,4,0,12" />
 
                     <CheckBox x:Name="ContextAwarenessCheck" Content="Context awareness (detect active app)"
                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
@@ -119,7 +171,7 @@
                     <TextBlock Text="API Keys" FontSize="16" FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" />
 
-                    <TextBlock Text="OpenAI API Key (required)" FontSize="13"
+                    <TextBlock Text="OpenAI API Key (for Whisper engines)" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <Grid Margin="0,0,0,12">
                         <PasswordBox x:Name="OpenAIKeyBox" Background="{StaticResource BgTertiaryBrush}"
@@ -129,14 +181,24 @@
                                      PasswordChanged="OpenAIKey_Changed" />
                     </Grid>
 
-                    <TextBlock Text="Anthropic API Key (optional, for AI cleanup)" FontSize="13"
+                    <TextBlock Text="Anthropic API Key (for Claude Audio / AI cleanup)" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                    <Grid>
+                    <Grid Margin="0,0,0,12">
                         <PasswordBox x:Name="AnthropicKeyBox" Background="{StaticResource BgTertiaryBrush}"
                                      Foreground="{StaticResource TextPrimaryBrush}"
                                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                                      Padding="10,8" FontSize="14"
                                      PasswordChanged="AnthropicKey_Changed" />
+                    </Grid>
+
+                    <TextBlock Text="Deepgram API Key (for Deepgram Nova-2)" FontSize="13"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <Grid>
+                        <PasswordBox x:Name="DeepgramKeyBox" Background="{StaticResource BgTertiaryBrush}"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                     Padding="10,8" FontSize="14"
+                                     PasswordChanged="DeepgramKey_Changed" />
                     </Grid>
 
                     <TextBlock Text="Keys are stored locally with base64 obfuscation." FontSize="11"

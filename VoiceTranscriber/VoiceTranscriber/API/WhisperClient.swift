@@ -19,6 +19,7 @@ final class WhisperClient {
     /// - Returns: The transcribed text
     func transcribe(
         fileURL: URL,
+        model: String = "gpt-4o-mini-transcribe",
         language: String? = "en",
         dictionaryWords: [String] = [],
         contextHint: String? = nil
@@ -31,9 +32,6 @@ final class WhisperClient {
         guard !audioData.isEmpty else {
             throw WhisperError.emptyAudioFile
         }
-
-        // Use gpt-4o-mini-transcribe for speed + accuracy (falls back to whisper-1 on error)
-        let model = "gpt-4o-mini-transcribe"
 
         let boundary = UUID().uuidString
         var request = URLRequest(url: URL(string: baseURL)!)

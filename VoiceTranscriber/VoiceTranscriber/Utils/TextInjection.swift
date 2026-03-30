@@ -6,12 +6,20 @@ import Carbon
 final class TextInjector {
 
     /// Injects the given text at the current cursor position in the active text field.
-    /// Uses pasteboard + Cmd+V which naturally inserts at cursor without replacing.
+    /// Automatically prepends a space if the cursor is right after non-whitespace text
+    /// to prevent consecutive transcriptions from running together.
     static func inject(text: String) {
-        // Always use pasteboard method — it reliably inserts at cursor
-        // without replacing existing content (unless user has a text selection,
-        // which is expected paste behavior)
-        injectViaPasteboard(text: text)
+        var textToInject = text
+
+        // Prepend space if cursor is right after non-whitespace text
+        if let existingText = readContextFromActiveField(),
+           !existingText.isEmpty,
+           let lastChar = existingText.last,
+           !lastChar.isWhitespace && !lastChar.isNewline {
+            textToInject = " " + textToInject
+        }
+
+        injectViaPasteboard(text: textToInject)
     }
 
     // MARK: - Pasteboard-Based Injection
