@@ -162,6 +162,13 @@ public class ConfigManager
         set { _data.DeepgramApiKeyObf = Obfuscate(value); Save(); }
     }
 
+    // Mistral API key
+    public string MistralApiKey
+    {
+        get => Deobfuscate(_data.MistralApiKeyObf);
+        set { _data.MistralApiKeyObf = Obfuscate(value); Save(); }
+    }
+
     public ConfigManager()
     {
         Load();
@@ -305,5 +312,6 @@ public class ConfigManager
         public bool UseAICleanup { get; set; } = true;
         public TranscriptionEngine TranscriptionEngine { get; set; } = TranscriptionEngine.WhisperMini;
         public string DeepgramApiKeyObf { get; set; } = "";
+        public string MistralApiKeyObf { get; set; } = "";
     }
 }

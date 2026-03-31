@@ -11,9 +11,11 @@ struct AppSettingsView: View {
     @State private var openAIKey = ""
     @State private var claudeKey = ""
     @State private var deepgramKey = ""
+    @State private var mistralKey = ""
     @State private var showOpenAIKey = false
     @State private var showClaudeKey = false
     @State private var showDeepgramKey = false
+    @State private var showMistralKey = false
     @State private var isCapturingHotkey = false
     @State private var showSavedAlert = false
     @State private var showDeleteConfirm = false
@@ -263,12 +265,21 @@ struct AppSettingsView: View {
                         isSaved: !(config.deepgramAPIKey ?? "").isEmpty,
                         link: ("console.deepgram.com", "https://console.deepgram.com")
                     )
+                    APIKeyField(
+                        label: "Mistral",
+                        placeholder: "...",
+                        key: $mistralKey,
+                        showKey: $showMistralKey,
+                        isSaved: !(config.mistralAPIKey ?? "").isEmpty,
+                        link: ("console.mistral.ai", "https://console.mistral.ai/api-keys")
+                    )
 
                     HStack {
                         Button("Save API Keys") {
                             config.openAIAPIKey = openAIKey.isEmpty ? nil : openAIKey
                             config.claudeAPIKey = claudeKey.isEmpty ? nil : claudeKey
                             config.deepgramAPIKey = deepgramKey.isEmpty ? nil : deepgramKey
+                            config.mistralAPIKey = mistralKey.isEmpty ? nil : mistralKey
                             showSavedAlert = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -310,6 +321,69 @@ struct AppSettingsView: View {
                         showDeleteConfirm = true
                     }
                     .controlSize(.small)
+                }
+
+                // Performance Log section
+                SettingsSection(title: "Performance Log", icon: "gauge.with.dots.needle.33percent") {
+                    let entries = PipelineLogger.shared.recentEntries(count: 10)
+                    if entries.isEmpty {
+                        Text("No transcriptions logged yet. Use the app to see timing data here.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(entries) { entry in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(entry.timestamp)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    if entry.error != nil {
+                                        Text("FAILED")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.red)
+                                    } else {
+                                        Text("\(entry.totalMs)ms total")
+                                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                            .foregroundColor(entry.totalMs < 2000 ? .green : entry.totalMs < 4000 ? .orange : .red)
+                                    }
+                                }
+                                if let error = entry.error {
+                                    Text(error)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.red)
+                                } else {
+                                    HStack(spacing: 12) {
+                                        Label("\(entry.transcribeMs)ms", systemImage: "waveform")
+                                        Label("\(entry.cleanupMs)ms", systemImage: entry.cleanupMethod == "claude" ? "sparkles" : "text.badge.checkmark")
+                                        Text("\(entry.wordCount)w")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .font(.system(size: 11))
+                                    if !entry.sttModel.isEmpty || !entry.cleanupModel.isEmpty {
+                                        HStack(spacing: 8) {
+                                            if !entry.sttModel.isEmpty {
+                                                Text("STT: \(entry.sttModel)")
+                                            }
+                                            if !entry.cleanupModel.isEmpty {
+                                                Text("Cleanup: \(entry.cleanupModel)")
+                                            }
+                                        }
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+
+                        Divider()
+
+                        Button("Open Full Log (CSV)") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: PipelineLogger.shared.logFilePath))
+                        }
+                        .controlSize(.small)
+                    }
                 }
 
                 // Uninstall section
@@ -363,6 +437,7 @@ struct AppSettingsView: View {
             openAIKey = config.openAIAPIKey ?? ""
             claudeKey = config.claudeAPIKey ?? ""
             deepgramKey = config.deepgramAPIKey ?? ""
+            mistralKey = config.mistralAPIKey ?? ""
             refreshPermissions()
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {

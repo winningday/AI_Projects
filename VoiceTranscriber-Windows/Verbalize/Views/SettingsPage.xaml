@@ -87,10 +87,20 @@
 
                     <RadioButton x:Name="EngineDeepgram" GroupName="Engine"
                                  Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
-                                 Margin="0,6,0,0" Checked="Engine_Changed">
+                                 Margin="0,6,0,2" Checked="Engine_Changed">
                         <StackPanel>
                             <TextBlock Text="Deepgram Nova-2" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="Nova-2 — very fast, great accuracy" FontSize="11"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+
+                    <RadioButton x:Name="EngineMistral" GroupName="Engine"
+                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                 Margin="0,6,0,0" Checked="Engine_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Mistral Voxtral" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="Voxtral Mini — fast, accurate, $0.003/min" FontSize="11"
                                        Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
                         </StackPanel>
                     </RadioButton>
@@ -181,7 +191,7 @@
                                      PasswordChanged="OpenAIKey_Changed" />
                     </Grid>
 
-                    <TextBlock Text="Anthropic API Key (for Claude Audio / AI cleanup)" FontSize="13"
+                    <TextBlock Text="Anthropic API Key (for AI cleanup)" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <Grid Margin="0,0,0,12">
                         <PasswordBox x:Name="AnthropicKeyBox" Background="{StaticResource BgTertiaryBrush}"
@@ -193,12 +203,22 @@
 
                     <TextBlock Text="Deepgram API Key (for Deepgram Nova-2)" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                    <Grid>
+                    <Grid Margin="0,0,0,12">
                         <PasswordBox x:Name="DeepgramKeyBox" Background="{StaticResource BgTertiaryBrush}"
                                      Foreground="{StaticResource TextPrimaryBrush}"
                                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                                      Padding="10,8" FontSize="14"
                                      PasswordChanged="DeepgramKey_Changed" />
+                    </Grid>
+
+                    <TextBlock Text="Mistral API Key (for Voxtral transcription)" FontSize="13"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <Grid>
+                        <PasswordBox x:Name="MistralKeyBox" Background="{StaticResource BgTertiaryBrush}"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                     Padding="10,8" FontSize="14"
+                                     PasswordChanged="MistralKey_Changed" />
                     </Grid>
 
                     <TextBlock Text="Keys are stored locally with base64 obfuscation." FontSize="11"

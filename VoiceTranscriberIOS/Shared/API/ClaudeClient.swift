@@ -46,9 +46,12 @@ final class ClaudeClient {
             inputContextHint: inputContextHint
         )
 
+        // Scale max_tokens to input — each word is ~1.3 tokens, add headroom
+        let estimatedTokens = max(4096, Int(Double(wordCount) * 2.0) + 512)
+
         let requestBody = ClaudeRequestWithSystem(
             model: modelID,
-            max_tokens: 4096,
+            max_tokens: estimatedTokens,
             system: systemPrompt,
             messages: [
                 ClaudeMessage(role: "user", content: "<transcript>\(trimmed)</transcript>")
@@ -60,7 +63,8 @@ final class ClaudeClient {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 15
+        // Scale timeout with text length — 15s base + 1s per 50 words
+        request.timeoutInterval = max(15, Double(wordCount) / 50.0 + 15.0)
 
         request.httpBody = try JSONEncoder().encode(requestBody)
 
@@ -105,6 +109,14 @@ final class ClaudeClient {
         3. NEVER say things like "I don't have a transcript" or "Could you provide the text" — the transcript IS the text in the tags.
         4. Output ONLY the cleaned transcript text. No prefixes, no labels, no quotes.
 
+        LENGTH RULE — THIS IS CRITICAL:
+        - Your output MUST be approximately the same length as the input.
+        - NEVER summarize, condense, shorten, or omit sentences.
+        - NEVER cut off the output early. Output the ENTIRE transcript from start to finish.
+        - Every single sentence and idea in the input MUST appear in your output.
+        - If the input is 500 words, your output should be ~450-500 words (minus fillers only).
+        - If your output is significantly shorter than the input, YOU HAVE FAILED.
+
         EXAMPLES OF CORRECT BEHAVIOR:
         - Input: <transcript>hey um could you fix that bug</transcript> → Output: Hey, could you fix that bug?
         - Input: <transcript>hello how are you doing today</transcript> → Output: Hello, how are you doing today?
@@ -118,7 +130,6 @@ final class ClaudeClient {
         - Keep contractions natural
         - Detect numbered lists from speech: "first apples second bananas" → "1. Apples\\n2. Bananas"
         - If the text is very short or a single word/phrase, return it with minimal changes
-        - Preserve ALL content from the transcript. Do not summarize, condense, or shorten. Every idea the speaker expressed must remain in your output.
 
         GARBLED/UNUSABLE INPUT: If the transcript is garbled, nonsensical, or completely unintelligible — output an empty string. Do not guess or invent text. Return nothing.
 

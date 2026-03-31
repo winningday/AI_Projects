@@ -76,6 +76,15 @@ struct SettingsView: View {
                         placeholder: "dg-..."
                     )
 
+                    APIKeyField(
+                        label: "Mistral API Key",
+                        key: Binding(
+                            get: { appState.config.mistralAPIKey ?? "" },
+                            set: { appState.config.mistralAPIKey = $0.isEmpty ? nil : $0 }
+                        ),
+                        placeholder: "..."
+                    )
+
                     if appState.config.hasAPIKeys {
                         Label("API keys configured", systemImage: "checkmark.circle.fill")
                             .foregroundColor(.green)

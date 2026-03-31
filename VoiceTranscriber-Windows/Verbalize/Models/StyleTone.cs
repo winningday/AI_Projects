@@ -5,7 +5,8 @@ public enum TranscriptionEngine
 {
     WhisperMini,
     WhisperFull,
-    Deepgram
+    Deepgram,
+    Mistral
 }
 
 public static class TranscriptionEngineExtensions
@@ -15,6 +16,7 @@ public static class TranscriptionEngineExtensions
         TranscriptionEngine.WhisperMini => "OpenAI Whisper (Fast)",
         TranscriptionEngine.WhisperFull => "OpenAI Whisper (Accurate)",
         TranscriptionEngine.Deepgram => "Deepgram Nova-2",
+        TranscriptionEngine.Mistral => "Mistral Voxtral",
         _ => "OpenAI Whisper (Fast)"
     };
 
@@ -23,6 +25,7 @@ public static class TranscriptionEngineExtensions
         TranscriptionEngine.WhisperMini => "gpt-4o-mini-transcribe — fast, good accuracy",
         TranscriptionEngine.WhisperFull => "gpt-4o-transcribe — best accuracy, slightly slower",
         TranscriptionEngine.Deepgram => "Nova-2 — very fast, great accuracy",
+        TranscriptionEngine.Mistral => "Voxtral Mini — fast, accurate, $0.003/min",
         _ => ""
     };
 }
