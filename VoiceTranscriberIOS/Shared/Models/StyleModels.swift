@@ -1,5 +1,27 @@
 import Foundation
 
+/// Which AI model to use for transcript cleanup.
+enum CleanupModel: String, CaseIterable, Codable, Identifiable {
+    case claudeHaiku = "claude_haiku"
+    case gpt4oMini = "gpt4o_mini"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .claudeHaiku: return "Claude Haiku"
+        case .gpt4oMini: return "GPT-4o-mini"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .claudeHaiku: return "Good quality, requires Claude key"
+        case .gpt4oMini: return "Very fast, uses OpenAI key"
+        }
+    }
+}
+
 /// Transcription engine choice.
 enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case whisperMini = "whisper_mini"

@@ -12,6 +12,7 @@ class KeyboardViewController: UIInputViewController {
     private let config = SharedConfig.shared
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
+    private let openAICleanupClient = OpenAICleanupClient()
     private let deepgramClient = DeepgramClient()
     private let mistralClient = MistralClient()
     private let audioRecorder = AudioRecorderIOS()
@@ -253,17 +254,32 @@ class KeyboardViewController: UIInputViewController {
             let needsAICleanup = config.useAICleanup || config.translationEnabled
             if needsAICleanup {
                 keyboardState.statusMessage = config.translationEnabled ? "Translating..." : "Cleaning..."
-                cleanedText = try await claudeClient.cleanTranscription(
-                    rawText,
-                    dictionaryWords: config.dictionaryWords,
-                    styleTone: config.defaultStyleTone,
-                    contextText: contextText,
-                    smartFormatting: config.smartFormatting,
-                    translationEnabled: config.translationEnabled,
-                    targetLanguage: config.targetLanguage,
-                    recentCorrections: config.recentCorrections,
-                    inputContextHint: inputContext
-                )
+                switch config.cleanupModel {
+                case .gpt4oMini:
+                    cleanedText = try await openAICleanupClient.cleanTranscription(
+                        rawText,
+                        dictionaryWords: config.dictionaryWords,
+                        styleTone: config.defaultStyleTone,
+                        contextText: contextText,
+                        smartFormatting: config.smartFormatting,
+                        translationEnabled: config.translationEnabled,
+                        targetLanguage: config.targetLanguage,
+                        recentCorrections: config.recentCorrections,
+                        inputContextHint: inputContext
+                    )
+                case .claudeHaiku:
+                    cleanedText = try await claudeClient.cleanTranscription(
+                        rawText,
+                        dictionaryWords: config.dictionaryWords,
+                        styleTone: config.defaultStyleTone,
+                        contextText: contextText,
+                        smartFormatting: config.smartFormatting,
+                        translationEnabled: config.translationEnabled,
+                        targetLanguage: config.targetLanguage,
+                        recentCorrections: config.recentCorrections,
+                        inputContextHint: inputContext
+                    )
+                }
             } else {
                 cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: config.defaultStyleTone)
             }

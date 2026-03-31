@@ -2,6 +2,28 @@ import Foundation
 import Security
 import ServiceManagement
 
+/// Which AI model to use for transcript cleanup.
+enum CleanupModel: String, CaseIterable, Codable, Identifiable {
+    case claudeHaiku = "claude_haiku"
+    case gpt4oMini = "gpt4o_mini"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .claudeHaiku: return "Claude Haiku"
+        case .gpt4oMini: return "GPT-4o-mini"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .claudeHaiku: return "Good quality, requires Claude key"
+        case .gpt4oMini: return "Very fast, uses OpenAI key"
+        }
+    }
+}
+
 /// Transcription engine choice.
 enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case whisperMini = "whisper_mini"
@@ -168,6 +190,7 @@ final class ConfigManager: ObservableObject {
         static let typingSpeed = "typingSpeed"
         static let corrections = "corrections"
         static let useAICleanup = "useAICleanup"
+        static let cleanupModel = "cleanupModel"
         static let transcriptionEngine = "transcriptionEngine"
     }
 
@@ -245,6 +268,11 @@ final class ConfigManager: ObservableObject {
     /// Whether to use Claude AI for transcript cleanup (default: false — uses programmatic cleanup)
     @Published var useAICleanup: Bool {
         didSet { defaults.set(useAICleanup, forKey: Keys.useAICleanup) }
+    }
+
+    /// Which AI model to use for cleanup (Claude Haiku or GPT-4o-mini)
+    @Published var cleanupModel: CleanupModel {
+        didSet { defaults.set(cleanupModel.rawValue, forKey: Keys.cleanupModel) }
     }
 
     /// Which transcription engine to use (Whisper or Apple Speech)
@@ -341,6 +369,12 @@ final class ConfigManager: ObservableObject {
         let savedTypingSpeed = defaults.integer(forKey: Keys.typingSpeed)
         self.typingSpeed = savedTypingSpeed > 0 ? savedTypingSpeed : 40
         self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
+        if let cleanupRaw = defaults.string(forKey: Keys.cleanupModel),
+           let cleanup = CleanupModel(rawValue: cleanupRaw) {
+            self.cleanupModel = cleanup
+        } else {
+            self.cleanupModel = .gpt4oMini
+        }
         if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
            let engine = TranscriptionEngine(rawValue: engineRaw) {
             self.transcriptionEngine = engine

@@ -30,6 +30,30 @@ public static class TranscriptionEngineExtensions
     };
 }
 
+/// <summary>Which AI model to use for transcript cleanup.</summary>
+public enum CleanupModel
+{
+    ClaudeHaiku,
+    Gpt4oMini
+}
+
+public static class CleanupModelExtensions
+{
+    public static string DisplayName(this CleanupModel model) => model switch
+    {
+        CleanupModel.ClaudeHaiku => "Claude Haiku",
+        CleanupModel.Gpt4oMini => "GPT-4o-mini",
+        _ => "GPT-4o-mini"
+    };
+
+    public static string Subtitle(this CleanupModel model) => model switch
+    {
+        CleanupModel.ClaudeHaiku => "Good quality, requires Claude key",
+        CleanupModel.Gpt4oMini => "Very fast, uses OpenAI key",
+        _ => ""
+    };
+}
+
 public enum StyleTone
 {
     Formal,

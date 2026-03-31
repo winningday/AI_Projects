@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
 
     private let whisperClient = WhisperClient()
     private let claudeClient = ClaudeClient()
+    private let openAICleanupClient = OpenAICleanupClient()
     private let deepgramClient = DeepgramClient()
     private let mistralClient = MistralClient()
     private let appleSpeechClient = AppleSpeechClient()
@@ -317,32 +318,51 @@ final class AppState: ObservableObject {
                 let needsAICleanup = config.useAICleanup || config.translationEnabled
                 let cleanupStart = CFAbsoluteTimeGetCurrent()
                 let cleanupMethod: String
+                let cleanupModelName: String
                 if needsAICleanup {
                     statusMessage = config.translationEnabled ? "Translating..." : "Cleaning up..."
-                    cleanedText = try await claudeClient.cleanTranscription(
-                        rawText,
-                        dictionaryWords: config.dictionaryWords,
-                        styleTone: styleTone,
-                        activeApp: activeApp,
-                        contextText: config.contextAwareness ? contextText : nil,
-                        smartFormatting: config.smartFormatting,
-                        translationEnabled: config.translationEnabled,
-                        targetLanguage: config.targetLanguage,
-                        recentCorrections: config.recentCorrections
-                    )
-                    cleanupMethod = "claude"
+                    switch config.cleanupModel {
+                    case .gpt4oMini:
+                        cleanedText = try await openAICleanupClient.cleanTranscription(
+                            rawText,
+                            dictionaryWords: config.dictionaryWords,
+                            styleTone: styleTone,
+                            activeApp: activeApp,
+                            contextText: config.contextAwareness ? contextText : nil,
+                            smartFormatting: config.smartFormatting,
+                            translationEnabled: config.translationEnabled,
+                            targetLanguage: config.targetLanguage,
+                            recentCorrections: config.recentCorrections
+                        )
+                        cleanupMethod = "openai"
+                        cleanupModelName = "gpt-4o-mini"
+                    case .claudeHaiku:
+                        cleanedText = try await claudeClient.cleanTranscription(
+                            rawText,
+                            dictionaryWords: config.dictionaryWords,
+                            styleTone: styleTone,
+                            activeApp: activeApp,
+                            contextText: config.contextAwareness ? contextText : nil,
+                            smartFormatting: config.smartFormatting,
+                            translationEnabled: config.translationEnabled,
+                            targetLanguage: config.targetLanguage,
+                            recentCorrections: config.recentCorrections
+                        )
+                        cleanupMethod = "claude"
+                        cleanupModelName = "claude-haiku-4-5"
+                    }
                 } else {
                     cleanedText = ProgrammaticCleaner.clean(rawText, styleTone: styleTone)
                     cleanupMethod = "programmatic"
+                    cleanupModelName = "none"
                 }
                 let cleanupMs = Int((CFAbsoluteTimeGetCurrent() - cleanupStart) * 1000)
-                let cleanupModel = cleanupMethod == "claude" ? "claude-haiku-4-5" : "none"
 
             guard !cleanedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 isProcessing = false
                 statusMessage = "Ready"
                 lastError = "No speech detected."
-                PipelineLogger.shared.log(engine: config.transcriptionEngine.displayName, sttModel: sttModel, transcribeMs: transcribeMs, cleanupMs: cleanupMs, cleanupMethod: cleanupMethod, cleanupModel: cleanupModel, audioDuration: duration, wordCount: 0, error: "Empty after cleanup")
+                PipelineLogger.shared.log(engine: config.transcriptionEngine.displayName, sttModel: sttModel, transcribeMs: transcribeMs, cleanupMs: cleanupMs, cleanupMethod: cleanupMethod, cleanupModel: cleanupModelName, audioDuration: duration, wordCount: 0, error: "Empty after cleanup")
                 return
             }
 
@@ -364,7 +384,7 @@ final class AppState: ObservableObject {
 
             let totalMs = Int((CFAbsoluteTimeGetCurrent() - pipelineStart) * 1000)
             let wordCount = cleanedText.split(separator: " ").count
-            PipelineLogger.shared.log(engine: config.transcriptionEngine.displayName, sttModel: sttModel, transcribeMs: transcribeMs, cleanupMs: cleanupMs, cleanupMethod: cleanupMethod, cleanupModel: cleanupModel, audioDuration: duration, wordCount: wordCount, totalMs: totalMs)
+            PipelineLogger.shared.log(engine: config.transcriptionEngine.displayName, sttModel: sttModel, transcribeMs: transcribeMs, cleanupMs: cleanupMs, cleanupMethod: cleanupMethod, cleanupModel: cleanupModelName, audioDuration: duration, wordCount: wordCount, totalMs: totalMs)
 
             lastTranscript = transcript
             isProcessing = false

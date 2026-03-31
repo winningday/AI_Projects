@@ -28,6 +28,7 @@ final class SharedConfig: ObservableObject {
         static let corrections = "corrections"
         static let defaultStyleTone = "defaultStyleTone"
         static let useAICleanup = "useAICleanup"
+        static let cleanupModel = "cleanupModel"
         static let transcriptionEngine = "transcriptionEngine"
     }
 
@@ -80,6 +81,10 @@ final class SharedConfig: ObservableObject {
 
     @Published var useAICleanup: Bool {
         didSet { defaults.set(useAICleanup, forKey: Keys.useAICleanup) }
+    }
+
+    @Published var cleanupModel: CleanupModel {
+        didSet { defaults.set(cleanupModel.rawValue, forKey: Keys.cleanupModel) }
     }
 
     @Published var transcriptionEngine: TranscriptionEngine {
@@ -176,6 +181,12 @@ final class SharedConfig: ObservableObject {
             self.defaultStyleTone = .casual
         }
         self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
+        if let cleanupRaw = defaults.string(forKey: Keys.cleanupModel),
+           let cleanup = CleanupModel(rawValue: cleanupRaw) {
+            self.cleanupModel = cleanup
+        } else {
+            self.cleanupModel = .gpt4oMini
+        }
         if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
            let engine = TranscriptionEngine(rawValue: engineRaw) {
             self.transcriptionEngine = engine
@@ -383,6 +394,10 @@ final class SharedConfig: ObservableObject {
             self.defaultStyleTone = tone
         }
         self.useAICleanup = defaults.object(forKey: Keys.useAICleanup) as? Bool ?? true
+        if let cleanupRaw = defaults.string(forKey: Keys.cleanupModel),
+           let cleanup = CleanupModel(rawValue: cleanupRaw) {
+            self.cleanupModel = cleanup
+        }
         if let engineRaw = defaults.string(forKey: Keys.transcriptionEngine),
            let engine = TranscriptionEngine(rawValue: engineRaw) {
             self.transcriptionEngine = engine

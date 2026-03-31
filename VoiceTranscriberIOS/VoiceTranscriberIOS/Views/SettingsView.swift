@@ -28,12 +28,21 @@ struct SettingsView: View {
 
                 // MARK: - Text Cleanup
                 Section {
-                    Toggle("AI Cleanup (Claude)", isOn: $appState.config.useAICleanup)
+                    Toggle("AI Cleanup", isOn: $appState.config.useAICleanup)
 
                     if appState.config.useAICleanup {
-                        Text("Uses Claude Haiku for intelligent formatting. Applies dictionary, corrections, style, and smart formatting. Requires Claude API key.")
-                            .font(.caption)
-                            .foregroundColor(.orange)
+                        Picker("Cleanup Model", selection: $appState.config.cleanupModel) {
+                            ForEach(CleanupModel.allCases) { model in
+                                VStack(alignment: .leading) {
+                                    Text(model.displayName)
+                                    Text(model.subtitle)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(model)
+                            }
+                        }
+                        .pickerStyle(.inline)
                     } else {
                         Text("Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed.")
                             .font(.caption)
