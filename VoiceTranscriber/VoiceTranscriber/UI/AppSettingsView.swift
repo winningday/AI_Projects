@@ -152,8 +152,8 @@ struct AppSettingsView: View {
                 SettingsSection(title: "Text Cleanup", icon: "sparkles") {
                     Toggle(isOn: $config.useAICleanup) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Use AI cleanup (Claude)")
-                            Text("Sends transcript to Claude for advanced cleanup. May occasionally modify your words.")
+                            Text("Use AI cleanup")
+                            Text("Sends transcript to an AI model for advanced cleanup. May occasionally modify your words.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
@@ -164,9 +164,18 @@ struct AppSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     } else {
-                        Text("AI cleanup uses Claude Haiku for intelligent formatting, self-correction handling, and context-aware styling. Requires a Claude API key.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.orange)
+                        Picker("Cleanup Model", selection: $config.cleanupModel) {
+                            ForEach(CleanupModel.allCases) { model in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(model.displayName)
+                                    Text(model.subtitle)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(model)
+                            }
+                        }
+                        .pickerStyle(.radioGroup)
                     }
 
                     Divider()

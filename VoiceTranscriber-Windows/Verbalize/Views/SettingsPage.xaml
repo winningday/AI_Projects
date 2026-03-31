@@ -115,13 +115,34 @@
                     <TextBlock Text="How transcribed text is cleaned up before pasting" FontSize="12"
                                Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12" />
 
-                    <CheckBox x:Name="UseAICleanupCheck" Content="Use AI cleanup (Claude Haiku)"
+                    <CheckBox x:Name="UseAICleanupCheck" Content="Use AI cleanup"
                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
                               Margin="0,0,0,4" Checked="Setting_Changed" Unchecked="Setting_Changed" />
                     <TextBlock x:Name="CleanupDescription"
                                Text="Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed."
                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                               Margin="20,0,0,12" TextWrapping="Wrap" />
+                               Margin="20,0,0,4" TextWrapping="Wrap" />
+
+                    <StackPanel x:Name="CleanupModelPanel" Margin="20,4,0,12">
+                        <RadioButton x:Name="CleanupGpt4oMini" GroupName="CleanupModel"
+                                     Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                     Margin="0,0,0,2" Checked="CleanupModel_Changed">
+                            <StackPanel>
+                                <TextBlock Text="GPT-4o-mini" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Text="Very fast, uses OpenAI key" FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="CleanupClaudeHaiku" GroupName="CleanupModel"
+                                     Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                     Margin="0,4,0,0" Checked="CleanupModel_Changed">
+                            <StackPanel>
+                                <TextBlock Text="Claude Haiku" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Text="Good quality, requires Claude key" FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
 
                     <Separator Margin="0,4,0,12" />
 

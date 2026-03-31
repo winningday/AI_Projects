@@ -41,6 +41,13 @@ public partial class SettingsPage : Page
 
         UseAICleanupCheck.IsChecked = _appState.Config.UseAICleanup;
         UpdateCleanupDescription();
+        // Cleanup model
+        switch (_appState.Config.CleanupModel)
+        {
+            case CleanupModel.Gpt4oMini: CleanupGpt4oMini.IsChecked = true; break;
+            case CleanupModel.ClaudeHaiku: CleanupClaudeHaiku.IsChecked = true; break;
+            default: CleanupGpt4oMini.IsChecked = true; break;
+        }
         ContextAwarenessCheck.IsChecked = _appState.Config.ContextAwareness;
         SmartFormattingCheck.IsChecked = _appState.Config.SmartFormatting;
         AutoDictionaryCheck.IsChecked = _appState.Config.AutoAddToDictionary;
@@ -169,12 +176,25 @@ public partial class SettingsPage : Page
         _appState.Config.MistralApiKey = MistralKeyBox.Password;
     }
 
+    private void CleanupModel_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+
+        if (CleanupGpt4oMini.IsChecked == true)
+            _appState.Config.CleanupModel = CleanupModel.Gpt4oMini;
+        else if (CleanupClaudeHaiku.IsChecked == true)
+            _appState.Config.CleanupModel = CleanupModel.ClaudeHaiku;
+    }
+
     private void UpdateCleanupDescription()
     {
         if (CleanupDescription == null) return;
         CleanupDescription.Text = _appState.Config.UseAICleanup
-            ? "AI cleanup uses Claude Haiku for intelligent formatting. May occasionally modify your words. Requires Claude API key."
+            ? "AI cleanup uses an LLM for intelligent formatting. Choose your preferred model below."
             : "Fast programmatic cleanup: capitalizes, adds punctuation, removes fillers. Your words are never changed.";
+        if (CleanupModelPanel != null)
+            CleanupModelPanel.Visibility = _appState.Config.UseAICleanup
+                ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ClearData_Click(object sender, RoutedEventArgs e)

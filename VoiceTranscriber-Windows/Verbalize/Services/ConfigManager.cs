@@ -148,6 +148,13 @@ public class ConfigManager
         set { _data.UseAICleanup = value; Save(); }
     }
 
+    // Cleanup model (which AI to use for cleanup)
+    public CleanupModel CleanupModel
+    {
+        get => _data.CleanupModel;
+        set { _data.CleanupModel = value; Save(); }
+    }
+
     // Transcription engine
     public TranscriptionEngine TranscriptionEngine
     {
@@ -310,6 +317,7 @@ public class ConfigManager
         public double TotalRecordingTime { get; set; }
         public bool HasCompletedOnboarding { get; set; } = false;
         public bool UseAICleanup { get; set; } = true;
+        public CleanupModel CleanupModel { get; set; } = CleanupModel.Gpt4oMini;
         public TranscriptionEngine TranscriptionEngine { get; set; } = TranscriptionEngine.WhisperMini;
         public string DeepgramApiKeyObf { get; set; } = "";
         public string MistralApiKeyObf { get; set; } = "";

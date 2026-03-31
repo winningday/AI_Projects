@@ -18,6 +18,7 @@ public class AppState : INotifyPropertyChanged, IDisposable
     public HotKeyManager HotKeyManager { get; } = new();
     public WhisperClient WhisperClient { get; } = new();
     public ClaudeClient ClaudeClient { get; } = new();
+    public OpenAICleanupClient OpenAICleanupClient { get; } = new();
     public DeepgramClient DeepgramClient { get; } = new();
     public ConfigManager Config { get; } = new();
     public TranscriptDatabase Database { get; } = new();
@@ -284,14 +285,32 @@ public class AppState : INotifyPropertyChanged, IDisposable
         string cleanupMethod;
         string cleanupModel;
         var needsAICleanup = Config.UseAICleanup || Config.TranslationEnabled;
-        if (needsAICleanup && !string.IsNullOrEmpty(Config.AnthropicApiKey))
+        if (needsAICleanup)
         {
-            cleanedText = await ClaudeClient.CleanTranscriptionAsync(
-                rawText, Config.AnthropicApiKey, tone, dictionaryWords,
-                Config.Corrections, null, _capturedAppName,
-                Config.TranslationEnabled, Config.TargetLanguage);
-            cleanupMethod = "claude";
-            cleanupModel = "claude-haiku-4-5";
+            switch (Config.CleanupModel)
+            {
+                case CleanupModel.Gpt4oMini when !string.IsNullOrEmpty(Config.OpenAIApiKey):
+                    cleanedText = await OpenAICleanupClient.CleanTranscriptionAsync(
+                        rawText, Config.OpenAIApiKey, tone, dictionaryWords,
+                        Config.Corrections, null, _capturedAppName,
+                        Config.TranslationEnabled, Config.TargetLanguage);
+                    cleanupMethod = "openai";
+                    cleanupModel = "gpt-4o-mini";
+                    break;
+                case CleanupModel.ClaudeHaiku when !string.IsNullOrEmpty(Config.AnthropicApiKey):
+                    cleanedText = await ClaudeClient.CleanTranscriptionAsync(
+                        rawText, Config.AnthropicApiKey, tone, dictionaryWords,
+                        Config.Corrections, null, _capturedAppName,
+                        Config.TranslationEnabled, Config.TargetLanguage);
+                    cleanupMethod = "claude";
+                    cleanupModel = "claude-haiku-4-5";
+                    break;
+                default:
+                    cleanedText = ProgrammaticCleaner.Clean(rawText, tone);
+                    cleanupMethod = "programmatic";
+                    cleanupModel = "none";
+                    break;
+            }
         }
         else
         {
