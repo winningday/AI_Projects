@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
     private let openAICleanupClient = OpenAICleanupClient()
     private let deepgramClient = DeepgramClient()
     private let mistralClient = MistralClient()
+    private let cohereClient = CohereTranscribeClient()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
     private var cancellables = Set<AnyCancellable>()
 
@@ -212,6 +213,12 @@ final class AppState: ObservableObject {
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords
                 )
+            case .cohereTranscribe:
+                rawText = try await cohereClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
             }
             let transcribeMs = Int((CFAbsoluteTimeGetCurrent() - transcribeStart) * 1000)
             let sttModel: String = {
@@ -220,6 +227,7 @@ final class AppState: ObservableObject {
                 case .whisperFull: return "gpt-4o-transcribe"
                 case .deepgram: return "nova-2"
                 case .mistral: return "voxtral-mini"
+                case .cohereTranscribe: return "cohere-transcribe-03-2026"
                 }
             }()
 

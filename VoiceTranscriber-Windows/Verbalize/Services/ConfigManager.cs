@@ -176,6 +176,13 @@ public class ConfigManager
         set { _data.MistralApiKeyObf = Obfuscate(value); Save(); }
     }
 
+    // Cohere API key
+    public string CohereApiKey
+    {
+        get => Deobfuscate(_data.CohereApiKeyObf);
+        set { _data.CohereApiKeyObf = Obfuscate(value); Save(); }
+    }
+
     public ConfigManager()
     {
         Load();
@@ -321,5 +328,6 @@ public class ConfigManager
         public TranscriptionEngine TranscriptionEngine { get; set; } = TranscriptionEngine.WhisperMini;
         public string DeepgramApiKeyObf { get; set; } = "";
         public string MistralApiKeyObf { get; set; } = "";
+        public string CohereApiKeyObf { get; set; } = "";
     }
 }

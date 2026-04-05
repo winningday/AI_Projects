@@ -51,6 +51,7 @@ final class AppState: ObservableObject {
     private let openAICleanupClient = OpenAICleanupClient()
     private let deepgramClient = DeepgramClient()
     private let mistralClient = MistralClient()
+    private let cohereClient = CohereTranscribeClient()
     private let appleSpeechClient = AppleSpeechClient()
     private let recordingWindow = RecordingWindowController()
     private lazy var correctionTracker = CorrectionTracker(config: config, database: database)
@@ -291,6 +292,12 @@ final class AppState: ObservableObject {
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords
                 )
+            case .cohereTranscribe:
+                rawText = try await cohereClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
             case .appleSpeech:
                 rawText = try await appleSpeechClient.transcribe(fileURL: url)
             }
@@ -301,6 +308,7 @@ final class AppState: ObservableObject {
                 case .whisperFull: return "gpt-4o-transcribe"
                 case .deepgram: return "nova-2"
                 case .mistral: return "voxtral-mini"
+                case .cohereTranscribe: return "cohere-transcribe-03-2026"
                 case .appleSpeech: return "apple-speech"
                 }
             }()

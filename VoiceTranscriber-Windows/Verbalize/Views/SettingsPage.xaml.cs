@@ -36,6 +36,7 @@ public partial class SettingsPage : Page
             case TranscriptionEngine.WhisperFull: EngineWhisperFull.IsChecked = true; break;
             case TranscriptionEngine.Deepgram: EngineDeepgram.IsChecked = true; break;
             case TranscriptionEngine.Mistral: EngineMistral.IsChecked = true; break;
+            case TranscriptionEngine.CohereTranscribe: EngineCohereTranscribe.IsChecked = true; break;
             default: EngineWhisperMini.IsChecked = true; break;
         }
 
@@ -70,6 +71,8 @@ public partial class SettingsPage : Page
             DeepgramKeyBox.Password = _appState.Config.DeepgramApiKey;
         if (!string.IsNullOrEmpty(_appState.Config.MistralApiKey))
             MistralKeyBox.Password = _appState.Config.MistralApiKey;
+        if (!string.IsNullOrEmpty(_appState.Config.CohereApiKey))
+            CohereKeyBox.Password = _appState.Config.CohereApiKey;
 
         _loading = false;
     }
@@ -162,6 +165,8 @@ public partial class SettingsPage : Page
             _appState.Config.TranscriptionEngine = TranscriptionEngine.Deepgram;
         else if (EngineMistral.IsChecked == true)
             _appState.Config.TranscriptionEngine = TranscriptionEngine.Mistral;
+        else if (EngineCohereTranscribe.IsChecked == true)
+            _appState.Config.TranscriptionEngine = TranscriptionEngine.CohereTranscribe;
     }
 
     private void DeepgramKey_Changed(object sender, RoutedEventArgs e)
@@ -174,6 +179,12 @@ public partial class SettingsPage : Page
     {
         if (_loading) return;
         _appState.Config.MistralApiKey = MistralKeyBox.Password;
+    }
+
+    private void CohereKey_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _appState.Config.CohereApiKey = CohereKeyBox.Password;
     }
 
     private void CleanupModel_Changed(object sender, RoutedEventArgs e)

@@ -12,10 +12,12 @@ struct AppSettingsView: View {
     @State private var claudeKey = ""
     @State private var deepgramKey = ""
     @State private var mistralKey = ""
+    @State private var cohereKey = ""
     @State private var showOpenAIKey = false
     @State private var showClaudeKey = false
     @State private var showDeepgramKey = false
     @State private var showMistralKey = false
+    @State private var showCohereKey = false
     @State private var isCapturingHotkey = false
     @State private var showSavedAlert = false
     @State private var showDeleteConfirm = false
@@ -282,6 +284,14 @@ struct AppSettingsView: View {
                         isSaved: !(config.mistralAPIKey ?? "").isEmpty,
                         link: ("console.mistral.ai", "https://console.mistral.ai/api-keys")
                     )
+                    APIKeyField(
+                        label: "Cohere",
+                        placeholder: "...",
+                        key: $cohereKey,
+                        showKey: $showCohereKey,
+                        isSaved: !(config.cohereAPIKey ?? "").isEmpty,
+                        link: ("dashboard.cohere.com", "https://dashboard.cohere.com/api-keys")
+                    )
 
                     HStack {
                         Button("Save API Keys") {
@@ -289,6 +299,7 @@ struct AppSettingsView: View {
                             config.claudeAPIKey = claudeKey.isEmpty ? nil : claudeKey
                             config.deepgramAPIKey = deepgramKey.isEmpty ? nil : deepgramKey
                             config.mistralAPIKey = mistralKey.isEmpty ? nil : mistralKey
+                            config.cohereAPIKey = cohereKey.isEmpty ? nil : cohereKey
                             showSavedAlert = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -447,6 +458,7 @@ struct AppSettingsView: View {
             claudeKey = config.claudeAPIKey ?? ""
             deepgramKey = config.deepgramAPIKey ?? ""
             mistralKey = config.mistralAPIKey ?? ""
+            cohereKey = config.cohereAPIKey ?? ""
             refreshPermissions()
         }
         .alert("API Keys Saved", isPresented: $showSavedAlert) {

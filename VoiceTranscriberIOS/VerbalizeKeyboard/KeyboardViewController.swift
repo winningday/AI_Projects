@@ -15,6 +15,7 @@ class KeyboardViewController: UIInputViewController {
     private let openAICleanupClient = OpenAICleanupClient()
     private let deepgramClient = DeepgramClient()
     private let mistralClient = MistralClient()
+    private let cohereClient = CohereTranscribeClient()
     private let audioRecorder = AudioRecorderIOS()
     private lazy var correctionTracker = CorrectionTracker()
 
@@ -236,6 +237,12 @@ class KeyboardViewController: UIInputViewController {
                 )
             case .mistral:
                 rawText = try await mistralClient.transcribe(
+                    fileURL: url,
+                    language: config.translationEnabled ? nil : "en",
+                    dictionaryWords: config.dictionaryWords
+                )
+            case .cohereTranscribe:
+                rawText = try await cohereClient.transcribe(
                     fileURL: url,
                     language: config.translationEnabled ? nil : "en",
                     dictionaryWords: config.dictionaryWords

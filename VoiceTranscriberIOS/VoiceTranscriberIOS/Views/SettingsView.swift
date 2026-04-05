@@ -94,6 +94,15 @@ struct SettingsView: View {
                         placeholder: "..."
                     )
 
+                    APIKeyField(
+                        label: "Cohere API Key",
+                        key: Binding(
+                            get: { appState.config.cohereAPIKey ?? "" },
+                            set: { appState.config.cohereAPIKey = $0.isEmpty ? nil : $0 }
+                        ),
+                        placeholder: "..."
+                    )
+
                     if appState.config.hasAPIKeys {
                         Label("API keys configured", systemImage: "checkmark.circle.fill")
                             .foregroundColor(.green)

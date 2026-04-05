@@ -158,6 +158,12 @@ public class AppState : INotifyPropertyChanged, IDisposable
             Status = AppStatus.Error;
             return;
         }
+        if (engine == TranscriptionEngine.CohereTranscribe && string.IsNullOrEmpty(Config.CohereApiKey))
+        {
+            ErrorMessage = "Cohere API key not set. Go to Settings to configure.";
+            Status = AppStatus.Error;
+            return;
+        }
 
         // Capture active app before recording
         _capturedAppName = Config.ContextAwareness ? TextInjector.GetActiveProcessName() : null;
@@ -242,6 +248,7 @@ public class AppState : INotifyPropertyChanged, IDisposable
             TranscriptionEngine.WhisperFull => "gpt-4o-transcribe",
             TranscriptionEngine.Deepgram => "nova-2",
             TranscriptionEngine.Mistral => "voxtral-mini",
+            TranscriptionEngine.CohereTranscribe => "cohere-transcribe-03-2026",
             _ => "gpt-4o-mini-transcribe"
         };
 
@@ -263,6 +270,10 @@ public class AppState : INotifyPropertyChanged, IDisposable
                 break;
             case TranscriptionEngine.Mistral:
                 rawText = await MistralClient.TranscribeAsync(filePath, Config.MistralApiKey,
+                    dictionaryWords, languageHint);
+                break;
+            case TranscriptionEngine.CohereTranscribe:
+                rawText = await CohereTranscribeClient.TranscribeAsync(filePath, Config.CohereApiKey,
                     dictionaryWords, languageHint);
                 break;
             default:

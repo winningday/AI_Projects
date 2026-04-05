@@ -104,6 +104,16 @@
                                        Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
                         </StackPanel>
                     </RadioButton>
+
+                    <RadioButton x:Name="EngineCohereTranscribe" GroupName="Engine"
+                                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                                 Margin="0,6,0,0" Checked="Engine_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Cohere Transcribe" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="Best accuracy (5.42% WER), free API" FontSize="11"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </Border>
 
@@ -240,6 +250,16 @@
                                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                                      Padding="10,8" FontSize="14"
                                      PasswordChanged="MistralKey_Changed" />
+                    </Grid>
+
+                    <TextBlock Text="Cohere API Key (for Cohere Transcribe)" FontSize="13"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,12,0,4" />
+                    <Grid>
+                        <PasswordBox x:Name="CohereKeyBox" Background="{StaticResource BgTertiaryBrush}"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                     Padding="10,8" FontSize="14"
+                                     PasswordChanged="CohereKey_Changed" />
                     </Grid>
 
                     <TextBlock Text="Keys are stored locally with base64 obfuscation." FontSize="11"
