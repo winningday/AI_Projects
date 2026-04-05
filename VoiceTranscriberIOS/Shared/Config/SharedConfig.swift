@@ -39,6 +39,7 @@ final class SharedConfig: ObservableObject {
         static let claude = "stored_claude_api_key"
         static let deepgram = "stored_deepgram_api_key"
         static let mistral = "stored_mistral_api_key"
+        static let cohere = "stored_cohere_api_key"
     }
 
     // MARK: - Published Properties
@@ -337,17 +338,35 @@ final class SharedConfig: ObservableObject {
         }
     }
 
+    var cohereAPIKey: String? {
+        get {
+            let stored = defaults.string(forKey: APIKeys.cohere)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["COHERE_API_KEY"]
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.cohere)
+            } else {
+                defaults.removeObject(forKey: APIKeys.cohere)
+            }
+            objectWillChange.send()
+        }
+    }
+
     var hasAPIKeys: Bool {
         let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
         let hasClaude = !(claudeAPIKey ?? "").isEmpty
         let hasDeepgram = !(deepgramAPIKey ?? "").isEmpty
         let hasMistral = !(mistralAPIKey ?? "").isEmpty
+        let hasCohere = !(cohereAPIKey ?? "").isEmpty
 
         // Check transcription engine key requirement
         switch transcriptionEngine.requiredKeyType {
         case .openAI: if !hasOpenAI { return false }
         case .deepgram: if !hasDeepgram { return false }
         case .mistral: if !hasMistral { return false }
+        case .cohere: if !hasCohere { return false }
         case .claude: if !hasClaude { return false }
         case .none: break
         }

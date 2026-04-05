@@ -6,7 +6,8 @@ public enum TranscriptionEngine
     WhisperMini,
     WhisperFull,
     Deepgram,
-    Mistral
+    Mistral,
+    CohereTranscribe
 }
 
 public static class TranscriptionEngineExtensions
@@ -17,6 +18,7 @@ public static class TranscriptionEngineExtensions
         TranscriptionEngine.WhisperFull => "OpenAI Whisper (Accurate)",
         TranscriptionEngine.Deepgram => "Deepgram Nova-2",
         TranscriptionEngine.Mistral => "Mistral Voxtral",
+        TranscriptionEngine.CohereTranscribe => "Cohere Transcribe",
         _ => "OpenAI Whisper (Fast)"
     };
 
@@ -26,6 +28,7 @@ public static class TranscriptionEngineExtensions
         TranscriptionEngine.WhisperFull => "gpt-4o-transcribe — best accuracy, slightly slower",
         TranscriptionEngine.Deepgram => "Nova-2 — very fast, great accuracy",
         TranscriptionEngine.Mistral => "Voxtral Mini — fast, accurate, $0.003/min",
+        TranscriptionEngine.CohereTranscribe => "Best accuracy (5.42% WER), free API",
         _ => ""
     };
 }

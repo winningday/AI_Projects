@@ -30,6 +30,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case whisperFull = "whisper_full"
     case deepgram = "deepgram"
     case mistral = "mistral"
+    case cohereTranscribe = "cohere_transcribe"
     case appleSpeech = "apple_speech"
 
     var id: String { rawValue }
@@ -40,6 +41,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         case .whisperFull: return "OpenAI Whisper (Accurate)"
         case .deepgram: return "Deepgram Nova-2"
         case .mistral: return "Mistral Voxtral"
+        case .cohereTranscribe: return "Cohere Transcribe"
         case .appleSpeech: return "Apple Speech (On-Device)"
         }
     }
@@ -50,6 +52,7 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         case .whisperFull: return "gpt-4o-transcribe — best accuracy, slightly slower. Requires OpenAI key."
         case .deepgram: return "Nova-2 — very fast, great accuracy. Requires Deepgram key."
         case .mistral: return "Voxtral Mini — fast, accurate, $0.003/min. Requires Mistral key."
+        case .cohereTranscribe: return "Best accuracy (5.42% WER), free API. Requires Cohere key."
         case .appleSpeech: return "Free, on-device, no API key. Lower accuracy."
         }
     }
@@ -60,13 +63,14 @@ enum TranscriptionEngine: String, CaseIterable, Codable, Identifiable {
         case .whisperMini, .whisperFull: return .openAI
         case .deepgram: return .deepgram
         case .mistral: return .mistral
+        case .cohereTranscribe: return .cohere
         case .appleSpeech: return .none
         }
     }
 }
 
 enum RequiredKeyType {
-    case openAI, claude, deepgram, mistral, none
+    case openAI, claude, deepgram, mistral, cohere, none
 }
 
 /// Style profile for different message contexts.
@@ -201,6 +205,7 @@ final class ConfigManager: ObservableObject {
         static let claude = "stored_claude_api_key"
         static let deepgram = "stored_deepgram_api_key"
         static let mistral = "stored_mistral_api_key"
+        static let cohere = "stored_cohere_api_key"
     }
 
     // MARK: - Published Properties
@@ -599,12 +604,29 @@ final class ConfigManager: ObservableObject {
         }
     }
 
+    var cohereAPIKey: String? {
+        get {
+            let stored = defaults.string(forKey: APIKeys.cohere)
+            if let stored, !stored.isEmpty { return deobfuscate(stored) }
+            return ProcessInfo.processInfo.environment["COHERE_API_KEY"]
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(obfuscate(value), forKey: APIKeys.cohere)
+            } else {
+                defaults.removeObject(forKey: APIKeys.cohere)
+            }
+            objectWillChange.send()
+        }
+    }
+
     /// Whether required API keys are configured for the current engine/cleanup settings.
     var hasAPIKeys: Bool {
         let hasOpenAI = !(openAIAPIKey ?? "").isEmpty
         let hasClaude = !(claudeAPIKey ?? "").isEmpty
         let hasDeepgram = !(deepgramAPIKey ?? "").isEmpty
         let hasMistral = !(mistralAPIKey ?? "").isEmpty
+        let hasCohere = !(cohereAPIKey ?? "").isEmpty
 
         // Check transcription engine key requirement
         switch transcriptionEngine.requiredKeyType {
@@ -612,6 +634,7 @@ final class ConfigManager: ObservableObject {
         case .claude: if !hasClaude { return false }
         case .deepgram: if !hasDeepgram { return false }
         case .mistral: if !hasMistral { return false }
+        case .cohere: if !hasCohere { return false }
         case .none: break
         }
 
