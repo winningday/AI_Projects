@@ -1,0 +1,93 @@
+---
+type: context
+scope: youtube-mastermind
+purpose: File map and architecture overview for the YouTube Mastermind system
+last_updated: 2026-03-22
+---
+
+project: youtube-mastermind
+description: >
+  Intelligent YouTube growth system. Orchestrates 8 specialized Claude agents
+  to take a creator from zero to monetized in 90 days. All strategy is
+  personalized to channel/config.yaml. Outputs are saved, dated, and tracked.
+
+entry_points:
+  - file: CLAUDE.md
+    purpose: Master orchestration document. Read first every session.
+  - file: channel/config.yaml
+    purpose: Creator's channel data. Single source of truth for all agents.
+  - file: MEMORY.md
+    purpose: Session log. Read to resume context.
+  - file: TODO.md
+    purpose: Active tasks. What to work on.
+
+agents:
+  - name: channel-blueprint
+    file: .claude/agents/channel-blueprint.md
+    purpose: Full channel strategy — positioning, pillars, schedule, 90-day roadmap
+    output_dir: outputs/blueprints/
+  - name: video-ideas
+    file: .claude/agents/video-ideas.md
+    purpose: 20 high-potential video ideas with hooks and viral rationale
+    output_dir: outputs/ideas/
+  - name: title-thumbnail
+    file: .claude/agents/title-thumbnail.md
+    purpose: 10 CTR-optimized titles + thumbnail descriptions per topic
+    output_dir: outputs/titles/
+  - name: script-builder
+    file: .claude/agents/script-builder.md
+    purpose: Full video scripts with hook, problem, value, CTA
+    output_dir: outputs/scripts/
+  - name: shorts-accelerator
+    file: .claude/agents/shorts-accelerator.md
+    purpose: Shorts strategy + 10 ideas + funnel system to main channel
+    output_dir: outputs/shorts/
+  - name: seo-system
+    file: .claude/agents/seo-system.md
+    purpose: Full SEO package — title, description, tags, chapters, keywords
+    output_dir: outputs/seo/
+  - name: community-builder
+    file: .claude/agents/community-builder.md
+    purpose: Daily 15-min engagement routine + collab + loyalty system
+    output_dir: outputs/community/
+  - name: monetization
+    file: .claude/agents/monetization.md
+    purpose: Pre-10K revenue strategy — AdSense, brands, products, affiliates
+    output_dir: outputs/monetization/
+
+output_structure:
+  outputs/blueprints/: Channel strategy documents
+  outputs/ideas/: Video idea batches
+  outputs/titles/: Title and thumbnail packages
+  outputs/scripts/: Full video scripts
+  outputs/shorts/: Shorts strategies and ideas
+  outputs/seo/: SEO optimization packages per video
+  outputs/community/: Community and engagement plans
+  outputs/monetization/: Revenue strategies and templates
+
+key_files:
+  - path: channel/config.yaml
+    description: Creator's channel config — niche, goals, stats, phase, monetization
+  - path: MEMORY.md
+    description: Reverse-chronological session log
+  - path: TODO.md
+    description: Active and upcoming tasks
+  - path: CLAUDE.md
+    description: Master orchestration rules and agent routing
+
+phases:
+  1:
+    name: Foundation
+    days: 1-30
+    focus: [channel-blueprint, video-ideas, script-builder]
+    milestone: "100 subs, 500 watch hours"
+  2:
+    name: Growth
+    days: 31-60
+    focus: [title-thumbnail, seo-system, shorts-accelerator]
+    milestone: "500 subs, 2000 watch hours"
+  3:
+    name: Monetization
+    days: 61-90
+    focus: [community-builder, monetization, video-ideas]
+    milestone: "1000 subs, 4000 watch hours, first revenue"
