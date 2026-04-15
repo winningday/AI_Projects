@@ -1,0 +1,89 @@
+---
+type: config
+scope: youtube-mastermind
+purpose: Creator's channel configuration — single source of truth for all agents
+last_updated: 2026-04-15
+---
+
+# ============================================================
+# YOUTUBE MASTERMIND — CHANNEL CONFIG
+# Fill this in before your first session. All agents read it.
+# ============================================================
+
+channel:
+  name: ""                          # Your channel name (or leave blank for suggestions)
+  url: ""                           # youtube.com/@yourhandle
+  niche: ""                         # e.g. "personal finance for freelancers"
+  target_audience: ""               # e.g. "25-35 year old freelance designers"
+  unique_angle: ""                  # What makes YOUR channel different from others in this niche?
+  tone: ""                          # conversational | educational | authoritative | entertaining | mix
+
+goals:
+  primary: ""                       # e.g. "replace my 9-5 income with YouTube revenue"
+  subscriber_target: 1000
+  watch_hours_target: 4000
+  revenue_target_monthly: 0        # $ per month target
+  timeline_days: 90
+  started_date: ""                  # YYYY-MM-DD — when you began this 90-day sprint
+
+current_state:
+  subscribers: 0
+  watch_hours: 0
+  videos_published: 0
+  shorts_published: 0
+  phase: 1                          # 1 = Foundation, 2 = Growth, 3 = Monetization
+  last_updated: ""                  # YYYY-MM-DD — update this when you update stats
+
+content_pillars:
+  # Add 3-5 content pillars. Agents will map ideas to these.
+  # - name: "Pillar Name"
+  #   description: "What this pillar covers"
+  #   frequency: "weekly | bi-weekly | monthly"
+  - name: ""
+    description: ""
+    frequency: ""
+
+upload_schedule:
+  long_form:
+    frequency: ""                   # e.g. "2x per week"
+    days: []                        # e.g. [Tuesday, Friday]
+    time: ""                        # e.g. "12:00 PM EST"
+  shorts:
+    frequency: ""                   # e.g. "3x per week"
+    days: []
+    active: false                   # Set true when Shorts strategy is launched
+
+monetization_readiness:
+  adsense_eligible: false           # Set true when you hit 1K subs + 4K hours
+  ypp_applied: false
+  products:
+    # - name: "Product Name"
+    #   type: "template | guide | course | workshop"
+    #   price: 0
+    #   url: ""
+    #   status: "idea | in-progress | launched"
+    []
+  affiliates:
+    # - name: "Program Name"
+    #   commission: ""
+    #   link: ""
+    #   integrated_in_videos: []
+    []
+  brand_deals:
+    # - brand: "Brand Name"
+    #   status: "outreach | negotiating | active | completed"
+    #   rate: 0
+    #   date: ""
+    []
+
+analytics:
+  avg_ctr: 0                        # % — update after first 10 videos
+  avg_view_duration: ""             # e.g. "4:32"
+  avg_views_per_video: 0
+  best_performing_video: ""
+  top_traffic_source: ""           # search | browse | suggested | external
+
+notes: >
+  Add any context here that agents should know about your situation.
+  e.g. "I have 2 hours per week to create content."
+  e.g. "I've been in this niche as a practitioner for 5 years."

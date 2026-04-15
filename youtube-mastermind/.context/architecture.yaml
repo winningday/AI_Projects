@@ -1,0 +1,54 @@
+---
+type: architecture
+scope: youtube-mastermind
+purpose: System design decisions and data flow for the YouTube Mastermind
+last_updated: 2026-03-22
+---
+
+system_name: YouTube Mastermind Masterplan
+design_philosophy: >
+  One source of truth (channel/config.yaml), 8 specialized agents, persistent
+  memory, dated outputs. Every session is purposeful. Every output is saved.
+  The system gets smarter as the creator fills in more data.
+
+data_flow:
+  1: Creator updates channel/config.yaml with niche, goals, current stats
+  2: Claude reads CLAUDE.md + config at session start
+  3: Creator states the task (or Claude infers from TODO.md)
+  4: Claude invokes the relevant sub-agent with channel context
+  5: Agent produces output, saved to outputs/<category>/YYYY-MM-DD-<topic>.md
+  6: MEMORY.md updated with what was done
+  7: TODO.md updated with next steps
+
+agent_architecture:
+  type: hierarchical
+  orchestrator: CLAUDE.md (main Claude instance)
+  sub_agents: 8 specialized agents in .claude/agents/
+  context_passing: channel/config.yaml passed to every agent invocation
+  output_persistence: all outputs saved to dated files in outputs/
+
+state_management:
+  channel_state: channel/config.yaml
+  session_state: MEMORY.md
+  task_state: TODO.md
+  output_archive: outputs/ (never deleted, always appended)
+
+naming_conventions:
+  output_files: "YYYY-MM-DD-<slug>.md"
+  agent_files: "<agent-name>.md"
+  config_files: "*.yaml with frontmatter"
+
+design_decisions:
+  - decision: No Python scripts for core logic
+    rationale: >
+      The system is designed to be operated by Claude Code directly.
+      Python is only used if automation/scheduling becomes needed for
+      repeatable workflows (e.g., bulk SEO processing).
+  - decision: All outputs are markdown with YAML frontmatter
+    rationale: Human-readable, git-trackable, easy to review and edit
+  - decision: Single channel/config.yaml as truth
+    rationale: Prevents drift between agents. One update = all agents see it.
+  - decision: Phases 1/2/3 gate agent priority
+    rationale: >
+      Prevents creator from jumping to monetization before foundation is built.
+      The system nudges toward the right agent for the current phase.

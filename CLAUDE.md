@@ -158,6 +158,7 @@ Hub files contain only: frontmatter + summary + links to sub-docs.
 | `watercolor_editor/` | Active | Python, ffmpeg, multi-stage pipeline | Needed | No | Needed | Needed |
 | `VoiceTranscriber-Windows/` | Active | C#, WPF, .NET 8, NAudio, SQLite | Yes | Yes | Yes | Yes |
 | `rotating-gif-maker/` | Complete | Python, PIL, OpenCV | Has one | No | No | No |
+| `youtube-mastermind/` | Active | Claude Code, 8 Agents, YAML config | Yes | Yes | Yes | Yes |
 
 **"Needed"** = create these files when you first work on that project. Use the templates in this document.
 
