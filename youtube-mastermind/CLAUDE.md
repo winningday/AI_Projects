@@ -51,7 +51,7 @@ Each agent is a specialized sub-agent with a focused role. Agents are defined in
 Use sub-agent delegation syntax:
 
 ```
-Use the Agent tool to invoke: agents/<agent-name>.md
+Use the Agent tool to invoke: .claude/agents/<agent-name>.md
 Pass context from: channel/config.yaml
 Save output to: outputs/<category>/YYYY-MM-DD-<topic>.md
 ```
